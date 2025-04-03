@@ -2,12 +2,11 @@ package proxy
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/OpenDgraph/Otter/internal/dgraph"
+	"github.com/OpenDgraph/Otter/internal/helpers"
 	"github.com/OpenDgraph/Otter/internal/loadbalancer"
 )
 
@@ -33,48 +32,59 @@ func NewProxy(balancer loadbalancer.Balancer, endpoints []string) (*Proxy, error
 }
 
 func (p *Proxy) HandleQuery(w http.ResponseWriter, r *http.Request) {
-	endpoint := p.balancer.Next()
-	if endpoint == "" {
-		http.Error(w, "No Dgraph endpoints available", http.StatusServiceUnavailable)
-		return
-	}
-
-	client, ok := p.clients[endpoint]
-	if !ok {
-		http.Error(w, "Dgraph client not found", http.StatusInternalServerError)
-		return
-	}
-
-	body, err := io.ReadAll(r.Body)
+	body, err := helpers.ReadRequestBody(r)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		helpers.WriteJSONError(w, http.StatusBadRequest, "Error reading request body")
 		return
 	}
 
-	var requestData map[string]interface{}
-	err = json.Unmarshal(body, &requestData)
+	contentType := r.Header.Get("Content-Type")
+	query, err := helpers.ParseQueryBody(contentType, body)
 	if err != nil {
-		http.Error(w, "Error unmarshalling request body", http.StatusBadRequest)
+		helpers.WriteJSONError(w, http.StatusUnsupportedMediaType, err.Error())
 		return
 	}
 
-	query, ok := requestData["query"].(string)
-	if !ok {
-		http.Error(w, "Query not found in request body", http.StatusBadRequest)
+	_, client, err := p.selectClient()
+	if err != nil {
+		helpers.WriteJSONError(w, http.StatusServiceUnavailable, err.Error())
 		return
 	}
 
 	resp, err := client.Query(context.Background(), query)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error querying Dgraph: %v", err), http.StatusInternalServerError)
+		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Sprintf("Error querying Dgraph: %v", err))
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(resp.Json)
+	helpers.WriteJSONResponse(w, http.StatusOK, resp.Json)
 }
 
 func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
-	// Implementar a lógica de mutação aqui
-	// ...
+	body, err := helpers.ReadRequestBody(r)
+	if err != nil {
+		helpers.WriteJSONError(w, http.StatusBadRequest, "Error reading request body")
+		return
+	}
+
+	contentType := r.Header.Get("Content-Type")
+	mutation, err := helpers.ParseMutationBody(contentType, body)
+	if err != nil {
+		helpers.WriteJSONError(w, http.StatusUnsupportedMediaType, err.Error())
+		return
+	}
+
+	_, client, err := p.selectClient()
+	if err != nil {
+		helpers.WriteJSONError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
+	resp, err := client.Mutate(context.Background(), mutation)
+	if err != nil {
+		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Sprintf("Error performing mutation: %v", err))
+		return
+	}
+
+	helpers.WriteJSONResponse(w, http.StatusOK, resp.Json)
 }
