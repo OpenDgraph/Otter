@@ -14,22 +14,16 @@ type Client struct {
 	dg *dgo.Dgraph
 }
 
-func NewClient(endpoints string, user, password string) (*Client, error) {
+func NewClient(endpoint string, user, password string) (*Client, error) {
 	opts := []dgo.ClientOption{
 		dgo.WithGrpcOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-		dgo.WithGrpcOption(grpc.WithDefaultServiceConfig(`{
-			"methodConfig": [{
-				"retryPolicy": {
-					"MaxAttempts": 4
-				}]
-		}`)),
 	}
 
 	if user != "" && password != "" {
 		opts = append(opts, dgo.WithACLCreds(user, password))
 	}
 
-	client, err := dgo.NewClient(endpoints, opts...)
+	client, err := dgo.NewClient(endpoint, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("could not create Dgraph client: %w", err)
 	}

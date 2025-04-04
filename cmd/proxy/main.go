@@ -28,14 +28,17 @@ func main() {
 		log.Fatalf("Error creating proxy: %v", err)
 	}
 
+	// Proxy HTTP server
 	mux := routing.SetupRoutes(proxy)
-	mux.HandleFunc("/ws", websocket.HandleWebSocketWithProxy(proxy))
-
+	mux.HandleFunc("/ws", websocket.HandleWebSocketWithProxy(proxy)) // opcional, mas útil
 	log.Printf("Starting proxy server on port %d\n", cfg.ProxyPort)
 	go func() {
 		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.ProxyPort), mux))
 	}()
 
+	// WebSocket server
+	wsMux := http.NewServeMux()
+	wsMux.HandleFunc("/ws", websocket.HandleWebSocketWithProxy(proxy))
 	log.Printf("Starting websocket server on port %d\n", cfg.WebSocketPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.WebSocketPort), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.WebSocketPort), wsMux))
 }

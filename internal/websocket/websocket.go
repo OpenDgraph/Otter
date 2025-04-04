@@ -61,12 +61,24 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 					conn.WriteMessage(websocket.TextMessage, fmt.Appendf(nil, `{"error":"%v"}`, err))
 					continue
 				}
+
 				resp, err := client.Query(context.Background(), msg.Query)
 				if err != nil {
 					conn.WriteMessage(websocket.TextMessage, fmt.Appendf(nil, `{"error":"%v"}`, err))
 					continue
 				}
-				conn.WriteMessage(websocket.TextMessage, resp.Json)
+
+				if msg.Verbose {
+					out := WSResponse{
+						Data:      resp.Json,
+						LatencyNs: resp.Latency.GetTotalNs(),
+					}
+					b, _ := json.Marshal(out)
+					conn.WriteMessage(websocket.TextMessage, b)
+				} else {
+					// Resposta direta, só o JSON da query
+					conn.WriteMessage(websocket.TextMessage, resp.Json)
+				}
 
 			case "mutation":
 				if msg.Mutation == "" {
@@ -78,6 +90,7 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 					conn.WriteMessage(websocket.TextMessage, fmt.Appendf(nil, `{"error":"%v"}`, err))
 					continue
 				}
+
 				m := &api.Mutation{
 					SetNquads: []byte(msg.Mutation),
 					CommitNow: msg.CommitNow,
@@ -87,7 +100,24 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 					conn.WriteMessage(websocket.TextMessage, fmt.Appendf(nil, `{"error":"%v"}`, err))
 					continue
 				}
-				conn.WriteMessage(websocket.TextMessage, resp.Json)
+
+				if msg.Verbose {
+					out := WSResponse{
+						Data:      resp.Json,
+						Uids:      resp.Uids,
+						CommitTs:  resp.Txn.GetCommitTs(),
+						Preds:     resp.Txn.GetPreds(),
+						LatencyNs: resp.Latency.GetTotalNs(),
+					}
+					b, _ := json.Marshal(out)
+					conn.WriteMessage(websocket.TextMessage, b)
+				} else {
+					data := resp.Json
+					if len(data) == 0 {
+						data = []byte(`{}`)
+					}
+					conn.WriteMessage(websocket.TextMessage, data)
+				}
 
 			case "upsert":
 				if msg.Query == "" || msg.Mutation == "" {
@@ -109,10 +139,26 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 
 				resp, err := client.Upsert(context.Background(), msg.Query, []*api.Mutation{mu}, msg.CommitNow)
 				if err != nil {
-					conn.WriteMessage(websocket.TextMessage, []byte(`{""error":"%v"}`))
+					out := WSResponse{Error: err.Error()}
+					b, _ := json.Marshal(out)
+					conn.WriteMessage(websocket.TextMessage, b)
 					continue
 				}
-				conn.WriteMessage(websocket.TextMessage, resp.Json)
+
+				out := WSResponse{
+					Data:      resp.Json,
+					Uids:      resp.Uids,
+					CommitTs:  resp.Txn.GetCommitTs(),
+					Preds:     resp.Txn.GetPreds(),
+					LatencyNs: resp.Latency.GetTotalNs(),
+				}
+
+				b, err := json.Marshal(out)
+				if err != nil {
+					conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"failed to encode response"}`))
+					continue
+				}
+				conn.WriteMessage(websocket.TextMessage, b)
 
 			default:
 				conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"unsupported type"}`))
