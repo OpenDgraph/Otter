@@ -23,7 +23,7 @@ func main() {
 		log.Fatalf("Error creating balancer: %v", err)
 	}
 
-	proxy, err := proxy.NewProxy(balancer, cfg.DgraphEndpoints)
+	proxy, err := proxy.NewProxy(balancer, cfg.DgraphEndpoints, cfg.DgraphUser, cfg.DgraphPassword)
 	if err != nil {
 		log.Fatalf("Error creating proxy: %v", err)
 	}
