@@ -11,9 +11,16 @@ type Config struct {
 	BalancerType    string
 	ProxyPort       int
 	WebSocketPort   int
+	DgraphUser      string
+	DgraphPassword  string
 }
 
 func LoadConfig() (*Config, error) {
+
+	user := os.Getenv("DGRAPH_USER")
+	password := os.Getenv("DGRAPH_PASSWORD")
+	//No errors returned if user and password are not set
+
 	dgraphEndpoints := os.Getenv("DGRAPH_ENDPOINTS")
 	if dgraphEndpoints == "" {
 		return nil, fmt.Errorf("DGRAPH_ENDPOINTS environment variable not set")
@@ -47,5 +54,7 @@ func LoadConfig() (*Config, error) {
 		BalancerType:    balancerType,
 		ProxyPort:       proxyPort,
 		WebSocketPort:   websocketPort,
+		DgraphUser:      user,
+		DgraphPassword:  password,
 	}, nil
 }
