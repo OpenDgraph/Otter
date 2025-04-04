@@ -1,0 +1,14 @@
+balancer_type: defined
+proxy_port: 8084
+websocket_port: 8081
+dgraph_user: ""
+dgraph_password: ""
+groups:
+  query:
+    - localhost:9080
+    - localhost:9088
+  mutation:
+    - localhost:9096
+  upsert:
+    - localhost:9096
+    - localhost:9096

@@ -5,18 +5,34 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 type Config struct {
-	DgraphEndpoints []string
-	BalancerType    string
-	ProxyPort       int
-	WebSocketPort   int
-	DgraphUser      string
-	DgraphPassword  string
+	Groups          map[string][]string `yaml:"groups,omitempty"` // query, mutation, upsert
+	DgraphEndpoints []string            `yaml:"-"`
+	BalancerType    string              `yaml:"balancer_type"`
+	ProxyPort       int                 `yaml:"proxy_port"`
+	WebSocketPort   int                 `yaml:"websocket_port"`
+	DgraphUser      string              `yaml:"dgraph_user"`
+	DgraphPassword  string              `yaml:"dgraph_password"`
 }
 
 func LoadConfig() (*Config, error) {
+
+	if filePath := os.Getenv("CONFIG_FILE"); filePath != "" {
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read config file: %w", err)
+		}
+
+		var cfg Config
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return nil, fmt.Errorf("failed to parse YAML config: %w", err)
+		}
+		return &cfg, nil
+	}
 
 	user := os.Getenv("DGRAPH_USER")
 	password := os.Getenv("DGRAPH_PASSWORD")
@@ -51,7 +67,7 @@ func LoadConfig() (*Config, error) {
 	if websocketPortStr == "" {
 		websocketPortStr = "8081" // Default
 	}
-	websocketPort, err := strconv.Atoi(websocketPortStr)
+	webSocketPort, err := strconv.Atoi(websocketPortStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid WEBSOCKET_PORT: %w", err)
 	}
@@ -60,7 +76,7 @@ func LoadConfig() (*Config, error) {
 		DgraphEndpoints: endpoints,
 		BalancerType:    balancerType,
 		ProxyPort:       proxyPort,
-		WebSocketPort:   websocketPort,
+		WebSocketPort:   webSocketPort,
 		DgraphUser:      user,
 		DgraphPassword:  password,
 	}, nil
