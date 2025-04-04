@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -24,6 +25,12 @@ func LoadConfig() (*Config, error) {
 	dgraphEndpoints := os.Getenv("DGRAPH_ENDPOINTS")
 	if dgraphEndpoints == "" {
 		return nil, fmt.Errorf("DGRAPH_ENDPOINTS environment variable not set")
+	}
+	endpoints := []string{}
+	for endpoint := range strings.SplitSeq(dgraphEndpoints, ",") {
+		if trimmed := strings.TrimSpace(endpoint); trimmed != "" {
+			endpoints = append(endpoints, trimmed)
+		}
 	}
 
 	balancerType := os.Getenv("BALANCER_TYPE")
@@ -50,7 +57,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	return &Config{
-		DgraphEndpoints: []string{dgraphEndpoints},
+		DgraphEndpoints: endpoints,
 		BalancerType:    balancerType,
 		ProxyPort:       proxyPort,
 		WebSocketPort:   websocketPort,

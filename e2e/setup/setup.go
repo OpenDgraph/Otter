@@ -72,7 +72,7 @@ func main() {
 
 	dg, err := dgo.NewClient("localhost:9080", opts...)
 	if err != nil {
-		fmt.Errorf("could not create Dgraph client: %w", err)
+		fmt.Println("could not create Dgraph client: %w", err)
 	}
 	setup(dg)
 }

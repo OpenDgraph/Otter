@@ -8,7 +8,7 @@
             "mode": "auto",
             "program": "cmd/proxy/main.go",
             "env": {
-                "DGRAPH_ENDPOINTS": "localhost:9080",
+                "DGRAPH_ENDPOINTS": "localhost:9080,localhost:9088,localhost:9096",
                 "PROXY_PORT": "8084",
                 "WEBSOCKET_PORT": "8081",
             }
