@@ -15,10 +15,10 @@ type Proxy struct {
 	clients  map[string]*dgraph.Client
 }
 
-func NewProxy(balancer loadbalancer.Balancer, endpoints []string) (*Proxy, error) {
+func NewProxy(balancer loadbalancer.Balancer, endpoints []string, user, password string) (*Proxy, error) {
 	clients := make(map[string]*dgraph.Client)
 	for _, endpoint := range endpoints {
-		client, err := dgraph.NewClient(endpoint)
+		client, err := dgraph.NewClient(endpoint, user, password)
 		if err != nil {
 			return nil, fmt.Errorf("error creating Dgraph client for %s: %w", endpoint, err)
 		}

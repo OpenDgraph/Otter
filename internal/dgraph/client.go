@@ -7,21 +7,38 @@ import (
 	"github.com/dgraph-io/dgo/v240"
 	"github.com/dgraph-io/dgo/v240/protos/api"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Client struct {
 	dg *dgo.Dgraph
 }
 
-func NewClient(endpoint string) (*Client, error) {
-	conn, err := grpc.Dial(endpoint, grpc.WithInsecure())
-	if err != nil {
-		return nil, fmt.Errorf("could not connect to Dgraph: %w", err)
+func NewClient(endpoints string, user, password string) (*Client, error) {
+	opts := []dgo.ClientOption{
+		dgo.WithGrpcOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		dgo.WithGrpcOption(grpc.WithDefaultServiceConfig(`{
+			"methodConfig": [{
+				"retryPolicy": {
+					"MaxAttempts": 4
+				}]
+		}`)),
 	}
 
-	return &Client{
-		dg: dgo.NewDgraphClient(api.NewDgraphClient(conn)),
-	}, nil
+	if user != "" && password != "" {
+		opts = append(opts, dgo.WithACLCreds(user, password))
+	}
+
+	client, err := dgo.NewClient(endpoints, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("could not create Dgraph client: %w", err)
+	}
+
+	return &Client{dg: client}, nil
+}
+
+func (c *Client) Close() {
+	c.dg.Close()
 }
 
 func (c *Client) Query(ctx context.Context, query string) (*api.Response, error) {
