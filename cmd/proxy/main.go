@@ -29,7 +29,7 @@ func main() {
 	}
 
 	mux := routing.SetupRoutes(proxy)
-	mux.HandleFunc("/ws", websocket.HandleWebSocket)
+	mux.HandleFunc("/ws", websocket.HandleWebSocketWithProxy(proxy))
 
 	log.Printf("Starting proxy server on port %d\n", cfg.ProxyPort)
 	go func() {

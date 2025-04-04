@@ -7,7 +7,7 @@ import (
 	"github.com/OpenDgraph/Otter/internal/dgraph"
 )
 
-func (p *Proxy) selectClient() (string, *dgraph.Client, error) {
+func (p *Proxy) SelectClient() (string, *dgraph.Client, error) {
 	endpoint := p.balancer.Next()
 	if endpoint == "" {
 		return "", nil, fmt.Errorf("| No Dgraph endpoints available")

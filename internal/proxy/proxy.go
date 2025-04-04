@@ -45,7 +45,7 @@ func (p *Proxy) HandleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, client, err := p.selectClient()
+	_, client, err := p.SelectClient()
 	if err != nil {
 		helpers.WriteJSONError(w, http.StatusServiceUnavailable, err.Error())
 		return
@@ -74,7 +74,7 @@ func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, client, err := p.selectClient()
+	_, client, err := p.SelectClient()
 	if err != nil {
 		helpers.WriteJSONError(w, http.StatusServiceUnavailable, err.Error())
 		return

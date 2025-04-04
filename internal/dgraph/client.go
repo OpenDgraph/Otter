@@ -42,7 +42,10 @@ func (c *Client) Close() {
 }
 
 func (c *Client) Query(ctx context.Context, query string) (*api.Response, error) {
-	resp, err := c.dg.NewReadOnlyTxn().Query(ctx, query)
+	txn := c.dg.NewReadOnlyTxn()
+	defer txn.Discard(ctx)
+
+	resp, err := txn.Query(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("error querying Dgraph: %w", err)
 	}
@@ -50,9 +53,28 @@ func (c *Client) Query(ctx context.Context, query string) (*api.Response, error)
 }
 
 func (c *Client) Mutate(ctx context.Context, mutation *api.Mutation) (*api.Response, error) {
-	resp, err := c.dg.NewTxn().Mutate(ctx, mutation)
+	txn := c.dg.NewTxn()
+	defer txn.Discard(ctx)
+
+	resp, err := txn.Mutate(ctx, mutation)
 	if err != nil {
 		return nil, fmt.Errorf("error mutating Dgraph: %w", err)
+	}
+	return resp, nil
+}
+
+func (c *Client) Upsert(ctx context.Context, query string, mutations []*api.Mutation, commitNow bool) (*api.Response, error) {
+	txn := c.dg.NewTxn()
+	defer txn.Discard(ctx)
+
+	req := &api.Request{
+		Query:     query,
+		Mutations: mutations,
+		CommitNow: commitNow,
+	}
+	resp, err := txn.Do(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("error performing upsert: %w", err)
 	}
 	return resp, nil
 }
