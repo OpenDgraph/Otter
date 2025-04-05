@@ -1,0 +1,36 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "proxy",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "cmd/proxy/main.go",
+            "env": {
+                "DGRAPH_ENDPOINTS": "localhost:9080,localhost:9088,localhost:9096",
+                "PROXY_PORT": "8084",
+                "WEBSOCKET_PORT": "8081",
+            }
+        },
+        {
+            "name": "proxy_yaml",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "cmd/proxy/main.go",
+            "env": {
+                "CONFIG_FILE": "${workspaceFolder}/manifest/config.yaml",
+                "PROXY_PORT": "8084",
+                "WEBSOCKET_PORT": "8081",
+            }
+        },
+        {
+            "name": "ws",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "e2e/ws/ws.go",
+        }
+    ]
+}
