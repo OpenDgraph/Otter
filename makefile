@@ -1,7 +1,11 @@
-BIN=Otter #BINARY NAME 
+#BINARY NAME
+BIN=Otter
 INSTALL_DIR=/usr/local/bin
-BD=build # BUILD DIR
-CDR=cmd/proxy # CURRENT DIR
+# BUILD DIR
+BD=build
+# CURRENT DIR
+CDR=cmd/proxy
+
 
 PLATFORMS = \
 	linux/amd64 \
