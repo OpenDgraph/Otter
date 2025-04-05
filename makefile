@@ -3,23 +3,30 @@ INSTALL_DIR=/usr/local/bin
 BD=build # BUILD DIR
 CDR=cmd/proxy # CURRENT DIR
 
-BDCMD=GOARCH=amd64 go build -o $(BD)/$(BIN)
+PLATFORMS = \
+	linux/amd64 \
+	linux/arm64 \
+	darwin/amd64 \
+	darwin/arm64
 
 all: build
 
 build:
-	go build -o $(BD)/$(BIN) $(CDR)/$(CDR)/main.go
+	go build -o $(BD)/$(BIN) $(CDR)/main.go
 
 install: build
 	sudo mv $(BD)/$(BIN) $(INSTALL_DIR)/$(BIN)
 
 clean:
-	rm -f $(BD)/$(BIN)
+	rm -rf $(BD)
 
 release:
 	@echo "Building for multiple platforms..."
 	@mkdir -p $(BD)
-	GOOS=linux $(BDCMD)-linux-amd64 $(CDR)/main.go
-	GOOS=linux $(BDCMD)-linux-arm64 $(CDR)/main.go
-	GOOS=darwin $(BDCMD)-darwin-amd64 $(CDR)/main.go
-	GOOS=darwin $(BDCMD)-darwin-arm64 $(CDR)/main.go
+	@for platform in $(PLATFORMS); do \
+		OS=$$(echo $$platform | cut -d/ -f1); \
+		ARCH=$$(echo $$platform | cut -d/ -f2); \
+		OUT=$(BD)/$(BIN)-$$OS-$$ARCH; \
+		echo "-> $$OS/$$ARCH"; \
+		GOOS=$$OS GOARCH=$$ARCH go build -o $$OUT $(CDR)/main.go || exit 1; \
+	done
