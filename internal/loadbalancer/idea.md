@@ -15,7 +15,7 @@ http://0.0.0.0:8080/state
 
 Also, zero :6080/state
 
-````JSON
+```JSON
 {
   "counter": "58",
   "groups": {
@@ -113,3 +113,19 @@ we can use to lease UIDs
 and
 
 :6080/moveTablet to balance tablets/data between groups.
+
+
+
+## Modes
+
+### Vanilla  
+A standard DQL approach with no prefixes—just the basics.
+In this mode, you’ll only be using features like the load balancer and its modes. You’ll also be able to analyze queries, use APIs like WebSocket, and get real-time cluster status updates.
+
+### GraphQL Vanilla  
+Just like Vanilla but uses Dgraph’s native GraphQL schema modeling for DQL queries.
+
+### DQL Ontology-Like 
+
+A graph model inspired by ontology structure, using prefixes at the predicate level. This makes sharding at the predicate level possible.
+This is a fully opinionated approach based on my own design choices.
