@@ -45,8 +45,16 @@ balancer_type: purposeful # or round-robin
 ###  Roadmap
 
 - [ ] Automatic health checks
-- [ ] `round-robin-healthy` support
+- [ ] Support for multiple Balancing strategies
 - [ ] Graph model abstraction
 - [ ] Become a framework
 
+More purposeful Balancing strategies:
+- [x] `round-robin` basic round-robin
+- [x] `round-robin-purposeful` with purpose
+- [ ] `round-robin-healthy` support
+- [ ] `round-robin-on-RW` separate readonly and write only
+- [ ] `round-robin-avoid-leaders` avoid leaders
+- [ ] `round-robin-leaders-only` leaders only
+- [ ] `round-robin-state-based` this will check the state of the Alpha and check memory usage and coroutine count
 ---
