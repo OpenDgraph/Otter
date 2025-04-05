@@ -2,6 +2,7 @@ package loadbalancer
 
 import (
 	"fmt"
+	"log"
 	"sync"
 )
 
@@ -38,6 +39,7 @@ func (b *RoundRobinBalancer) Next() string {
 func NewBalancer(balancerType string, endpoints []string) (Balancer, error) {
 	switch balancerType {
 	case "round-robin":
+		log.Printf("| Running round-robin")
 		return NewRoundRobinBalancer(endpoints), nil
 	case "round-robin-healthy":
 		// Implement a round-robin healthy only balancer

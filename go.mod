@@ -6,6 +6,7 @@ require (
 	github.com/dgraph-io/dgo/v240 v240.2.0
 	github.com/gorilla/websocket v1.5.3
 	google.golang.org/grpc v1.71.1
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (

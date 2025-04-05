@@ -50,13 +50,12 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 				continue
 			}
 
+			msg.validate(conn)
+
 			switch msg.Type {
-			case "query":
-				if msg.Query == "" {
-					conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"missing query field"}`))
-					continue
-				}
-				_, client, err := p.SelectClient()
+
+			case TypeQuery:
+				_, client, err := p.SelectClientAuto("query")
 				if err != nil {
 					conn.WriteMessage(websocket.TextMessage, fmt.Appendf(nil, `{"error":"%v"}`, err))
 					continue
@@ -80,12 +79,8 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 					conn.WriteMessage(websocket.TextMessage, resp.Json)
 				}
 
-			case "mutation":
-				if msg.Mutation == "" {
-					conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"missing mutation field"}`))
-					continue
-				}
-				_, client, err := p.SelectClient()
+			case TypeMutation:
+				_, client, err := p.SelectClientAuto("mutation")
 				if err != nil {
 					conn.WriteMessage(websocket.TextMessage, fmt.Appendf(nil, `{"error":"%v"}`, err))
 					continue
@@ -119,12 +114,8 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 					conn.WriteMessage(websocket.TextMessage, data)
 				}
 
-			case "upsert":
-				if msg.Query == "" || msg.Mutation == "" {
-					conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"missing query or mutation field"}`))
-					continue
-				}
-				_, client, err := p.SelectClient()
+			case TypeUpsert:
+				_, client, err := p.SelectClientAuto("upsert")
 				if err != nil {
 					conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"%v"}`))
 					continue
