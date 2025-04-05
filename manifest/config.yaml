@@ -11,4 +11,4 @@ groups:
     - localhost:9096
   upsert:
     - localhost:9096
-    - localhost:9096
+    - localhost:9080

@@ -11,8 +11,29 @@ import (
 )
 
 type Proxy struct {
-	balancer loadbalancer.Balancer
-	clients  map[string]*dgraph.Client
+	balancer   loadbalancer.Balancer
+	Purposeful loadbalancer.PurposefulBalancer
+	clients    map[string]*dgraph.Client
+}
+
+func NewPurposefulProxy(balancer loadbalancer.PurposefulBalancer, user, password string) (*Proxy, error) {
+	clients := map[string]*dgraph.Client{}
+
+	for _, ep := range balancer.AllEndpoints() {
+		if _, ok := clients[ep]; ok {
+			continue
+		}
+		client, err := dgraph.NewClient(ep, user, password)
+		if err != nil {
+			return nil, fmt.Errorf("error creating Dgraph client for %s: %w", ep, err)
+		}
+		clients[ep] = client
+	}
+
+	return &Proxy{
+		Purposeful: balancer,
+		clients:    clients,
+	}, nil
 }
 
 func NewProxy(balancer loadbalancer.Balancer, endpoints []string, user, password string) (*Proxy, error) {
@@ -45,7 +66,7 @@ func (p *Proxy) HandleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, client, err := p.SelectClient()
+	_, client, err := p.SelectClientAuto("query")
 	if err != nil {
 		helpers.WriteJSONError(w, http.StatusServiceUnavailable, err.Error())
 		return
@@ -74,7 +95,7 @@ func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, client, err := p.SelectClient()
+	_, client, err := p.SelectClientAuto("mutation")
 	if err != nil {
 		helpers.WriteJSONError(w, http.StatusServiceUnavailable, err.Error())
 		return
