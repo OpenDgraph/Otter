@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/gorilla/websocket"
 )
@@ -18,43 +19,34 @@ const (
 )
 
 func (m *WSMessage) validate(conn *websocket.Conn) error {
+	send := func(msg string) error {
+		conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(`{"error":"%s"}`, msg)))
+		return errors.New(msg)
+	}
+
 	switch m.Type {
-	case TypeAuth:
+	case "":
+		return send("missing type field")
+	case TypeAuth, TypeLogin:
 		if m.Token == "" {
-			conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"missing token field"}`))
-			return errors.New("missing token field")
+			return send("missing token field")
 		}
-	case TypeLogin:
-		if m.Token == "" {
-			conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"missing token field"}`))
-			return errors.New("missing token field")
-		}
-	case TypeLogout:
-		return nil
-	case TypeState:
-		return nil
-	case TypePing:
+	case TypeLogout, TypeState, TypePing:
 		return nil
 	case TypeQuery:
 		if m.Query == "" {
-			conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"missing query field"}`))
-			return errors.New("missing query field")
+			return send("missing query field")
 		}
 	case TypeMutation:
 		if m.Mutation == "" {
-			conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"missing mutation field"}`))
-			return errors.New("missing mutation field")
+			return send("missing mutation field")
 		}
 	case TypeUpsert:
 		if m.Query == "" || m.Mutation == "" {
-			conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"missing query or mutation field"}`))
-			return errors.New("missing upsert fields")
+			return send("missing query or mutation field")
 		}
-	case "":
-		return errors.New("missing type field")
 	default:
-		return errors.New("unknown type field")
-
+		return send("unknown type field")
 	}
 	return nil
 }
