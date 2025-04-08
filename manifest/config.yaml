@@ -3,6 +3,8 @@ proxy_port: 8084
 websocket_port: 8081
 dgraph_user: ""
 dgraph_password: ""
+enable_http: true
+enable_websocket: false
 groups:
   query:
     - localhost:9080

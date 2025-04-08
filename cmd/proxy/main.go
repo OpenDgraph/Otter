@@ -44,15 +44,27 @@ func main() {
 	}
 
 	// Proxy HTTP server
-	mux := routing.SetupRoutes(proxyInstance)
-	log.Printf("Starting proxy server on port %d\n", cfg.ProxyPort)
-	go func() {
-		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.ProxyPort), mux))
-	}()
+	if cfg.EnableHTTP {
+		mux := routing.SetupRoutes(proxyInstance)
+		log.Printf("Starting proxy server on port %d\n", cfg.ProxyPort)
+		go func() {
+			log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.ProxyPort), mux))
+		}()
+	} else {
+		log.Println("HTTP proxy server disabled.")
+	}
 
 	// WebSocket server
-	wsMux := http.NewServeMux()
-	wsMux.HandleFunc("/ws", websocket.HandleWebSocketWithProxy(proxyInstance))
-	log.Printf("Starting websocket server on port %d\n", cfg.WebSocketPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.WebSocketPort), wsMux))
+	if cfg.EnableWebSocket {
+		wsMux := http.NewServeMux()
+		wsMux.HandleFunc("/ws", websocket.HandleWebSocketWithProxy(proxyInstance))
+		log.Printf("Starting websocket server on port %d\n", cfg.WebSocketPort)
+		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.WebSocketPort), wsMux))
+	} else {
+		log.Println("WebSocket server disabled.")
+	}
+
+	if !cfg.EnableHTTP && !cfg.EnableWebSocket {
+		log.Fatal("Both HTTP and WebSocket servers are disabled. Nothing to run.")
+	}
 }

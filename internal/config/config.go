@@ -17,67 +17,80 @@ type Config struct {
 	WebSocketPort   int                 `yaml:"websocket_port"`
 	DgraphUser      string              `yaml:"dgraph_user"`
 	DgraphPassword  string              `yaml:"dgraph_password"`
+	EnableHTTP      bool                `yaml:"enable_http"`
+	EnableWebSocket bool                `yaml:"enable_websocket"`
 }
 
 func LoadConfig() (*Config, error) {
+	var cfg Config
 
 	if filePath := os.Getenv("CONFIG_FILE"); filePath != "" {
 		data, err := os.ReadFile(filePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read config file: %w", err)
 		}
-
-		var cfg Config
 		if err := yaml.Unmarshal(data, &cfg); err != nil {
 			return nil, fmt.Errorf("failed to parse YAML config: %w", err)
 		}
-		return &cfg, nil
 	}
 
-	user := os.Getenv("DGRAPH_USER")
-	password := os.Getenv("DGRAPH_PASSWORD")
-	//No errors returned if user and password are not set
-
-	dgraphEndpoints := os.Getenv("DGRAPH_ENDPOINTS")
-	if dgraphEndpoints == "" {
-		return nil, fmt.Errorf("DGRAPH_ENDPOINTS environment variable not set")
+	if val := os.Getenv("ENABLE_HTTP"); val != "" {
+		cfg.EnableHTTP = val != "false"
+	} else if !cfg.EnableHTTP { // default true if undefined in YAML
+		cfg.EnableHTTP = true
 	}
-	endpoints := []string{}
-	for endpoint := range strings.SplitSeq(dgraphEndpoints, ",") {
-		if trimmed := strings.TrimSpace(endpoint); trimmed != "" {
-			endpoints = append(endpoints, trimmed)
+
+	if val := os.Getenv("ENABLE_WEBSOCKET"); val != "" {
+		cfg.EnableWebSocket = val != "false"
+	} else if !cfg.EnableWebSocket {
+		cfg.EnableWebSocket = true
+	}
+
+	if val := os.Getenv("DGRAPH_USER"); val != "" {
+		cfg.DgraphUser = val
+	}
+	if val := os.Getenv("DGRAPH_PASSWORD"); val != "" {
+		cfg.DgraphPassword = val
+	}
+
+	if val := os.Getenv("DGRAPH_ENDPOINTS"); val != "" {
+		endpoints := []string{}
+		for _, ep := range strings.Split(val, ",") {
+			if trimmed := strings.TrimSpace(ep); trimmed != "" {
+				endpoints = append(endpoints, trimmed)
+			}
 		}
+		cfg.DgraphEndpoints = endpoints
+	} else if len(cfg.DgraphEndpoints) == 0 {
+		return nil, fmt.Errorf("DGRAPH_ENDPOINTS must be set either via env or YAML")
 	}
 
-	balancerType := os.Getenv("BALANCER_TYPE")
-	if balancerType == "" {
-		balancerType = "round-robin" // Default
+	if val := os.Getenv("BALANCER_TYPE"); val != "" {
+		cfg.BalancerType = val
+	}
+	if cfg.BalancerType == "" {
+		cfg.BalancerType = "round-robin"
 	}
 
-	proxyPortStr := os.Getenv("PROXY_PORT")
-	if proxyPortStr == "" {
-		proxyPortStr = "8080" // Default
-	}
-	proxyPort, err := strconv.Atoi(proxyPortStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid PROXY_PORT: %w", err)
-	}
-
-	websocketPortStr := os.Getenv("WEBSOCKET_PORT")
-	if websocketPortStr == "" {
-		websocketPortStr = "8081" // Default
-	}
-	webSocketPort, err := strconv.Atoi(websocketPortStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid WEBSOCKET_PORT: %w", err)
+	if val := os.Getenv("PROXY_PORT"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			cfg.ProxyPort = parsed
+		} else {
+			return nil, fmt.Errorf("invalid PROXY_PORT: %w", err)
+		}
+	} else if cfg.ProxyPort == 0 {
+		cfg.ProxyPort = 8080
 	}
 
-	return &Config{
-		DgraphEndpoints: endpoints,
-		BalancerType:    balancerType,
-		ProxyPort:       proxyPort,
-		WebSocketPort:   webSocketPort,
-		DgraphUser:      user,
-		DgraphPassword:  password,
-	}, nil
+	if val := os.Getenv("WEBSOCKET_PORT"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			cfg.WebSocketPort = parsed
+		} else {
+			return nil, fmt.Errorf("invalid WEBSOCKET_PORT: %w", err)
+		}
+	} else if cfg.WebSocketPort == 0 {
+		cfg.WebSocketPort = 8081
+	}
+
+	return &cfg, nil
 }
