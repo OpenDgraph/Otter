@@ -6,10 +6,11 @@ Otter is a lightweight proxy designed to intelligently balance traffic to [Dgrap
 
 ### Features
 
--  Query
--  Mutation
--  Upsert
--  WebSocket JSON API (`ws://localhost:8081/ws`)
+-  Round-robin and purpose-based balancing
+-  HTTP proxy for Dgraph `/query` and `/mutate`
+-  WebSocket server with support for `query`, `mutation`, and `upsert`
+-  Simple token-based authentication
+-  Configurable via environment variables or YAML
 
 ---
 
@@ -30,6 +31,11 @@ Otter is a lightweight proxy designed to intelligently balance traffic to [Dgrap
 ### Run Locally
 
 ```bash
+git clone https://github.com/OpenDgraph/Otter.git
+cd Otter
+```
+
+```bash
 export CONFIG_FILE=./manifest/config.yaml
 go run cmd/proxy/main.go
 ```
@@ -38,6 +44,72 @@ Set your balancer strategy inside `config.yaml`:
 
 ```yaml
 balancer_type: purposeful # or round-robin
+```
+
+---
+
+###  HTTP Proxy Endpoints
+
+| Endpoint   | Method | Description         |
+|------------|--------|---------------------|
+| `/query`   | POST   | Executes a DQL query |
+| `/mutate`  | POST   | Executes a mutation  |
+
+Supported Content-Types:
+
+- `application/json`
+- `application/dql`
+
+Example request:
+```bash
+curl -X POST http://localhost:8080/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ data(func: has(email)) { uid name email } }"}'
+```
+
+---
+
+---
+
+### WebSocket Usage
+
+**URL**: `ws://localhost:8081/ws`
+
+#### Supported message types:
+
+- `auth` -> authenticate
+- `ping` -> keep connection alive
+- `query` / `mutation` / `upsert` → require authentication
+
+#### Example (after auth):
+
+```json
+{
+  "type": "query",
+  "query": "{ data(func: has(email)) { uid name email } }",
+  "token": "banana",
+  "verbose": true
+}
+```
+
+###  Load Balancing Modes
+
+Available types:
+
+- `round-robin` *(default)*
+- `defined` *(per-purpose: query/mutation/upsert)*
+
+To use `defined`, provide a YAML like this:
+
+```yaml
+balancer_type: defined
+groups:
+  query:
+    - localhost:9080
+  mutation:
+    - localhost:9081
+  upsert:
+    - localhost:9082
 ```
 
 ---
