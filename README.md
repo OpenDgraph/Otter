@@ -4,6 +4,12 @@
 
 Otter is a lightweight proxy designed to intelligently balance traffic to [Dgraph](https://dgraph.io). It currently supports round-robin or purpose-based balancing between groups of endpoints.
 
+# Why this Software?
+
+Read [Why](why.md) this software was created.
+
+---
+
 ### Features
 
 -  Round-robin and purpose-based balancing
