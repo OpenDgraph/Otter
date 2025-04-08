@@ -9,6 +9,7 @@ type WSMessage struct {
 	Cond      string `json:"cond,omitempty"` // Optional for upsert
 	CommitNow bool   `json:"commitNow,omitempty"`
 	Verbose   bool   `json:"verbose,omitempty"`
+	Token     string `json:"token,omitempty"`
 }
 
 type WSResponse struct {

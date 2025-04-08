@@ -22,6 +22,14 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+func checkAuth(authenticated bool, conn *websocket.Conn) bool {
+	if !authenticated {
+		conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"papers please!"}`))
+		return false
+	}
+	return true
+}
+
 func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -37,6 +45,8 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 
 		log.Printf("| Client connected: %s\n", conn.RemoteAddr())
 
+		authenticated := false
+
 		for {
 			_, msgBytes, err := conn.ReadMessage()
 			if err != nil {
@@ -50,11 +60,30 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 				continue
 			}
 
-			msg.validate(conn)
+			// só valida estrutura
+			if err := msg.validate(conn); err != nil {
+				continue
+			}
 
 			switch msg.Type {
+			case TypePing:
+				conn.WriteMessage(websocket.TextMessage, []byte(`{"status":"pong"}`))
+
+			case TypeAuth:
+				if IsValidToken(msg.Token) {
+					authenticated = true
+					conn.WriteMessage(websocket.TextMessage, []byte(`{"status":"authenticated"}`))
+				} else {
+					conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"invalid token"}`))
+				}
+				continue
 
 			case TypeQuery:
+				isAuthorized := checkAuth(authenticated, conn)
+				if !isAuthorized {
+					continue
+				}
+
 				_, client, err := p.SelectClientAuto("query")
 				if err != nil {
 					conn.WriteMessage(websocket.TextMessage, fmt.Appendf(nil, `{"error":"%v"}`, err))
@@ -80,6 +109,10 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 				}
 
 			case TypeMutation:
+				isAuthorized := checkAuth(authenticated, conn)
+				if !isAuthorized {
+					continue
+				}
 				_, client, err := p.SelectClientAuto("mutation")
 				if err != nil {
 					conn.WriteMessage(websocket.TextMessage, fmt.Appendf(nil, `{"error":"%v"}`, err))
@@ -115,6 +148,10 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 				}
 
 			case TypeUpsert:
+				isAuthorized := checkAuth(authenticated, conn)
+				if !isAuthorized {
+					continue
+				}
 				_, client, err := p.SelectClientAuto("upsert")
 				if err != nil {
 					conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"%v"}`))
