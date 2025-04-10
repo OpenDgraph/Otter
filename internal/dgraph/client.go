@@ -15,6 +15,8 @@ type Client struct {
 }
 
 func NewClient(endpoint string, user, password string) (*Client, error) {
+	fmt.Println("Creating Dgraph client...")
+	fmt.Println("Endpoint:", endpoint)
 	opts := []dgo.ClientOption{
 		dgo.WithGrpcOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 	}

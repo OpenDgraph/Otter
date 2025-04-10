@@ -16,6 +16,7 @@ var _ PurposefulBalancer = (*definedBalancer)(nil)
 func NewPurposefulBalancer(groups map[string][]string) PurposefulBalancer {
 	result := make(map[string]*RoundRobinBalancer)
 	for purpose, eps := range groups {
+		fmt.Printf("Purpose: %s, Endpoints: %v\n", purpose, eps)
 		result[purpose] = NewRoundRobinBalancer(eps)
 	}
 	return &definedBalancer{groups: result}

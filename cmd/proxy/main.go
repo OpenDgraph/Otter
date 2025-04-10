@@ -25,6 +25,7 @@ func main() {
 	switch cfg.BalancerType {
 	case "defined", "purposeful":
 		balancer := loadbalancer.NewPurposefulBalancer(cfg.Groups)
+		fmt.Println("Using purposeful balancer")
 		proxyInstance, err = proxy.NewPurposefulProxy(balancer, cfg.DgraphUser, cfg.DgraphPassword)
 	default:
 		var balancer loadbalancer.Balancer

@@ -5,9 +5,10 @@ services:
     build:
       context: ../../
       dockerfile: examples/cluster/Dockerfile
+      target: final
     container_name: otter
     ports:
-      - "8080:8080"
+      - "8084:8084"
       - "8089:8089"
     depends_on:
       - dgraph-alpha
@@ -42,10 +43,14 @@ services:
       dgraph alpha
       -p /dgraph/p1
       -w /dgraph/w1
-      --my=dgraph-alpha:7081
+      --my=dgraph-alpha1:7081
       --zero=dgraph-zero:5080
       --security whitelist=0.0.0.0/0
       -o 1
+    networks:
+      default:
+        aliases:
+          - dgraph-alpha1
 
   dgraph-alpha2:
     image: dgraph/dgraph:latest

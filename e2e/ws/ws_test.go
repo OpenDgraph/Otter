@@ -99,7 +99,7 @@ func TestWebSocket(t *testing.T) {
 	// 7. Faz a query
 	msg = WSMessage{
 		Type:  "query",
-		Query: `{ data(func: has(email)) { uid name email } }`,
+		Query: `{ data(func: has(name)) { uid name email } }`,
 	}
 	payload, _ = json.Marshal(msg)
 	conn.WriteMessage(websocket.TextMessage, payload)

@@ -6,7 +6,7 @@ dgraph_password: ""
 enable_http: true
 enable_websocket: true
 dgraph_endpoints: # Needed if using simple round-robin balancing
-  - dgraph-alpha:9080
+  - dgraph-alpha1:9081
   - dgraph-alpha2:9082
 groups:
   query:
