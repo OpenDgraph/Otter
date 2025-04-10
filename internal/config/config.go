@@ -90,7 +90,7 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("invalid WEBSOCKET_PORT: %w", err)
 		}
 	} else if cfg.WebSocketPort == 0 {
-		cfg.WebSocketPort = 8081
+		cfg.WebSocketPort = 8089
 	}
 
 	if cfgYaml, err := yaml.Marshal(&cfg); err == nil {

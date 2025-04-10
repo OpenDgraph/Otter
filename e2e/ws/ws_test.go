@@ -24,7 +24,7 @@ func containsError(b []byte) bool {
 }
 
 func TestWebSocket(t *testing.T) {
-	wsURL := "ws://localhost:8081/ws"
+	wsURL := "ws://localhost:8089/ws"
 
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
@@ -45,7 +45,7 @@ func TestWebSocket(t *testing.T) {
 	// 1. Manda mensagem inválida (sem token)
 	// msg := WSMessage{
 	// 	Type:      "mutation",
-	// 	Mutation:  `<0x1> <name> "Alice Updated" .`,
+	// 	Mutation:  `<_:new> <name> "Alice Updated" .`,
 	// 	CommitNow: true,
 	// 	Verbose:   true,
 	// }
@@ -83,7 +83,7 @@ func TestWebSocket(t *testing.T) {
 	// 6. Agora faz a mutation de verdade
 	msg := WSMessage{
 		Type:      "mutation",
-		Mutation:  `<0x1> <name> "Alice Updated" .`,
+		Mutation:  `<_:new> <name> "Alice Updated" .`,
 		CommitNow: true,
 		Verbose:   true,
 	}

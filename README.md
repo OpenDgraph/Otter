@@ -20,6 +20,49 @@ Read [Why](why.md) this software was created.
 
 ---
 
+## Run Otter with Docker
+
+Requirements
+
+* Clone the repository
+
+* Docker
+
+* Docker Compose
+
+* (optional) make installed
+
+#### Run with make
+
+```bash
+make rund
+```
+
+ Manual Docker Compose
+If you don't have make:
+
+```bash
+cd examples/cluster
+docker compose up --build
+```
+
+#### Configuration
+By default, Otter will load config from:
+
+```ini
+CONFIG_FILE=/app/manifest/config_docker.yaml
+```
+
+If you want to change the config:
+
+```
+manifest/config_docker.yaml
+```
+
+Or override with environment variables (see internal/config/config.go for supported vars)
+
+---
+
 ### Example WebSocket Payload
 
 ```json
@@ -79,7 +122,7 @@ curl -X POST http://localhost:8080/query \
 
 ### WebSocket Usage
 
-**URL**: `ws://localhost:8081/ws`
+**URL**: `ws://localhost:8089/ws`
 
 #### Supported message types:
 

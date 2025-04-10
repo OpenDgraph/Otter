@@ -6,14 +6,14 @@ dgraph_password: ""
 enable_http: true
 enable_websocket: true
 dgraph_endpoints: # Needed if using simple round-robin balancing
-  - localhost:9080
-  - localhost:9088
+  - dgraph-alpha:9080
+  - dgraph-alpha2:9082
 groups:
   query:
-    - localhost:9081
-    - localhost:9082
+    - dgraph-alpha1:9081
+    - dgraph-alpha2:9082
   mutation:
-    - localhost:9090
+    - dgraph-alpha3:9083
   upsert:
-    - localhost:9090
-    - localhost:9082
+    - dgraph-alpha3:9083
+    - dgraph-alpha2:9082

@@ -11,7 +11,7 @@ import (
 )
 
 func TestPersistentConnection(t *testing.T) {
-	wsURL := "ws://localhost:8081/ws"
+	wsURL := "ws://localhost:8089/ws"
 
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
