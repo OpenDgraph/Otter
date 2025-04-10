@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -11,7 +12,7 @@ import (
 
 type Config struct {
 	Groups          map[string][]string `yaml:"groups,omitempty"` // query, mutation, upsert
-	DgraphEndpoints []string            `yaml:"-"`
+	DgraphEndpoints []string            `yaml:"dgraph_endpoints"`
 	BalancerType    string              `yaml:"balancer_type"`
 	ProxyPort       int                 `yaml:"proxy_port"`
 	WebSocketPort   int                 `yaml:"websocket_port"`
@@ -90,6 +91,13 @@ func LoadConfig() (*Config, error) {
 		}
 	} else if cfg.WebSocketPort == 0 {
 		cfg.WebSocketPort = 8081
+	}
+
+	if cfgYaml, err := yaml.Marshal(&cfg); err == nil {
+		log.Println("| Loaded config:")
+		log.Println(string(cfgYaml))
+	} else {
+		log.Printf("| Failed to print config: %v\n", err)
 	}
 
 	return &cfg, nil
