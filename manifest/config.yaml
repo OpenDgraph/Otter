@@ -4,13 +4,16 @@ websocket_port: 8081
 dgraph_user: ""
 dgraph_password: ""
 enable_http: true
-enable_websocket: false
+enable_websocket: true
+dgraph_endpoints: # Needed if using simple round-robin balancing
+  - localhost:9080
+  - localhost:9088
 groups:
   query:
-    - localhost:9080
-    - localhost:9088
+    - localhost:9081
+    - localhost:9082
   mutation:
-    - localhost:9096
+    - localhost:9090
   upsert:
-    - localhost:9096
-    - localhost:9080
+    - localhost:9090
+    - localhost:9082

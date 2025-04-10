@@ -5,7 +5,7 @@ INSTALL_DIR=/usr/local/bin
 BD=build
 # CURRENT DIR
 CDR=cmd/proxy
-
+CONFIG_PATH=manifest/config.yaml
 
 PLATFORMS = \
 	linux/amd64 \
@@ -34,3 +34,15 @@ release:
 		echo "-> $$OS/$$ARCH"; \
 		GOOS=$$OS GOARCH=$$ARCH go build -o $$OUT $(CDR)/main.go || exit 1; \
 	done
+
+run-local: build
+	CONFIG_FILE=$(CONFIG_PATH) ./$(BD)/$(BIN)
+
+rund:
+	docker compose -f examples/cluster/docker-compose.yml up --build
+
+stopd:
+	docker compose -f examples/cluster/docker-compose.yml down
+
+build-docker:
+	docker build -t otter-local -f examples/cluster/Dockerfile .
