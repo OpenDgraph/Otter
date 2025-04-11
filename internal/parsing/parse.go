@@ -3,8 +3,9 @@ package parsing
 import (
 	"fmt"
 
+	"github.com/dgraph-io/dgo/v240/protos/api"
 	dqlpkg "github.com/hypermodeinc/dgraph/v24/dql"
-	// _ "github.com/hypermodeinc/dgraph/v24/dql"
+
 	schemapkg "github.com/hypermodeinc/dgraph/v24/schema"
 )
 
@@ -29,12 +30,10 @@ func ParseSchema(schema string) (schemapkg.ParsedSchema, error) {
 	return *AST, nil
 }
 
-func ParseMutation(mutation string) (dqlpkg.Result, error) {
-	AST, err := dqlpkg.Parse(dqlpkg.Request{Str: mutation})
+func ParseMutation(mutation string) (*api.Request, error) {
+	AST, err := dqlpkg.ParseMutation(mutation)
 	if err != nil {
-		return dqlpkg.Result{}, fmt.Errorf("failed to parse DQL mutation: %w", err)
+		return nil, fmt.Errorf("failed to parse DQL mutation: %w", err)
 	}
-
-	// fmt.Println("Parsed DQL mutation:", AST)
 	return AST, nil
 }

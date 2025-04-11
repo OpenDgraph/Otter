@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/OpenDgraph/Otter/internal/api"
 	"github.com/OpenDgraph/Otter/internal/config"
 	"github.com/OpenDgraph/Otter/internal/loadbalancer"
 	"github.com/OpenDgraph/Otter/internal/proxy"
@@ -46,8 +47,12 @@ func main() {
 
 	// Proxy HTTP server
 	if cfg.EnableHTTP {
-		mux := routing.SetupRoutes(proxyInstance)
+		mux := http.NewServeMux()
+		mux.Handle("/", routing.SetupRoutes(proxyInstance))
+		mux.HandleFunc("/validate/dql", api.ValidateDQLHandler)
+		mux.HandleFunc("/validate/schema", api.ValidateSchemaHandler)
 		log.Printf("Starting proxy server on port %d\n", cfg.ProxyPort)
+
 		go func() {
 			log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", cfg.ProxyPort), mux))
 		}()
@@ -68,4 +73,5 @@ func main() {
 	if !cfg.EnableHTTP && !cfg.EnableWebSocket {
 		log.Fatal("Both HTTP and WebSocket servers are disabled. Nothing to run.")
 	}
+
 }
