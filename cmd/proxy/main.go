@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/OpenDgraph/Otter/internal/api"
 	"github.com/OpenDgraph/Otter/internal/config"
 	"github.com/OpenDgraph/Otter/internal/loadbalancer"
 	"github.com/OpenDgraph/Otter/internal/proxy"
@@ -49,8 +48,7 @@ func main() {
 	if cfg.EnableHTTP {
 		mux := http.NewServeMux()
 		mux.Handle("/", routing.SetupRoutes(proxyInstance))
-		mux.HandleFunc("/validate/dql", api.ValidateDQLHandler)
-		mux.HandleFunc("/validate/schema", api.ValidateSchemaHandler)
+
 		log.Printf("Starting proxy server on port %d\n", cfg.ProxyPort)
 
 		go func() {

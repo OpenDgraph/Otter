@@ -3,7 +3,10 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 
 	"github.com/OpenDgraph/Otter/internal/dgraph"
 	"github.com/OpenDgraph/Otter/internal/helpers"
@@ -50,6 +53,35 @@ func NewProxy(balancer loadbalancer.Balancer, endpoints []string, user, password
 		balancer: balancer,
 		clients:  clients,
 	}, nil
+}
+
+// ! TODO: Add tests
+func (p *Proxy) HandleGraphQL(w http.ResponseWriter, r *http.Request) {
+	var backendHost string
+	var err error
+
+	if p.Purposeful != nil {
+		backendHost, err = p.Purposeful.Next("query") // could we use "graphql"? sure || TODO
+	} else if p.balancer != nil {
+		backendHost = p.balancer.Next()
+	}
+
+	if err != nil {
+		helpers.WriteJSONError(w, http.StatusServiceUnavailable, fmt.Sprintf("Error selecting GraphQL endpoint: %v", err))
+		return
+	}
+	if backendHost == "" {
+		helpers.WriteJSONError(w, http.StatusServiceUnavailable, "No available GraphQL backend")
+		return
+	}
+
+	targetURL := &url.URL{Scheme: "http", Host: backendHost, Path: "/graphql"}
+
+	proxy := httputil.NewSingleHostReverseProxy(targetURL)
+
+	log.Printf("Proxying GraphQL request to %s", targetURL)
+
+	proxy.ServeHTTP(w, r)
 }
 
 func (p *Proxy) HandleQuery(w http.ResponseWriter, r *http.Request) {
