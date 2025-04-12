@@ -3,6 +3,7 @@ module github.com/OpenDgraph/Otter
 go 1.24.0
 
 require (
+	github.com/alecthomas/participle/v2 v2.1.4
 	github.com/dgraph-io/dgo/v240 v240.2.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/hypermodeinc/dgraph/v24 v24.1.2
