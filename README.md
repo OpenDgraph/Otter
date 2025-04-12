@@ -10,6 +10,13 @@ Read [Why](why.md) this software was created.
 
 ---
 
+
+# Otter Design
+
+Current design.
+
+![Otter Design](assets/design.png)
+
 ### Features
 
 -  Round-robin and purpose-based balancing
