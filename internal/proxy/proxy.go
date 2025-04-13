@@ -92,7 +92,7 @@ func (p *Proxy) HandleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	contentType := r.Header.Get("Content-Type")
-	query, err := helpers.ParseQueryBody(contentType, body)
+	query, err := helpers.CheckQueryBody(contentType, body)
 	if err != nil {
 		helpers.WriteJSONError(w, http.StatusUnsupportedMediaType, err.Error())
 		return
@@ -121,7 +121,7 @@ func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	contentType := r.Header.Get("Content-Type")
-	mutation, err := helpers.ParseMutationBody(contentType, body)
+	mutation, err := helpers.CheckMutationBody(contentType, body)
 	if err != nil {
 		helpers.WriteJSONError(w, http.StatusUnsupportedMediaType, err.Error())
 		return
