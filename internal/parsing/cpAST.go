@@ -10,10 +10,10 @@ import (
 // ==================
 
 type Query struct {
-	Match  *MatchClause  `"MATCH" @@`
-	Create *CreateClause `[ "CREATE" @@ ]`
-	Where  *WhereClause  `[ "WHERE" @@ ]`
-	Return *ReturnClause `"RETURN" @@`
+	Match  *MatchClause  `parser:"\"MATCH\" @@"`
+	Create *CreateClause `parser:"[ \"CREATE\" @@ ]"`
+	Where  *WhereClause  `parser:"[ \"WHERE\" @@ ]"`
+	Return *ReturnClause `parser:"\"RETURN\" @@"`
 }
 
 // ==================
@@ -21,7 +21,7 @@ type Query struct {
 // ==================
 
 type CreateClause struct {
-	Patterns []*Pattern `@@ { "," @@ }`
+	Patterns []*Pattern `parser:"@@ { \",\" @@ }"`
 }
 
 // ==================
@@ -29,44 +29,44 @@ type CreateClause struct {
 // ==================
 
 type MatchClause struct {
-	Patterns []*Pattern `@@ { "," @@ }`
+	Patterns []*Pattern `parser:"@@ { \",\" @@ }"`
 }
 
 type Pattern struct {
-	StartNode *NodePattern   `"(" @@ ")"` // O padrão DEVE começar com um nó
-	Segments  []*PathSegment ` { @@ } `   // Segmentos de relação/nó subsequentes
+	StartNode *NodePattern   `parser:"\"(\" @@ \")\""` // O padrão DEVE começar com um nó
+	Segments  []*PathSegment `parser:" { @@ } "`       // Segmentos de relação/nó subsequentes
 }
 
 type NodePattern struct {
-	Variable   string      `@Ident`
-	Label      string      `[ ":" @(Ident | Keyword) ]`
-	Properties *Properties `[ @@ ]` // Propriedades são opcionais e definidas em sua própria struct
+	Variable   string      `parser:"@Ident"`
+	Label      string      `parser:"[ \":\" @(Ident | Keyword) ]"`
+	Properties *Properties `parser:"[ @@ ]"` // Propriedades são opcionais e definidas em sua própria struct
 }
 
 type PathSegment struct {
-	Relationship *RelationshipPattern `@@`         // Detalhes da relação (setas, tipo, alias)
-	EndNode      *NodePattern         `"(" @@ ")"` // O nó no final deste segmento
+	Relationship *RelationshipPattern `parser:"@@"`             // Detalhes da relação (setas, tipo, alias)
+	EndNode      *NodePattern         `parser:"\"(\" @@ \")\""` // O nó no final deste segmento
 }
 
 type RelationshipPattern struct {
-	LeftArrow  string       `(@ArrowL | @Punct)` // Captura '<-' ou '-' (Punct aqui DEVE ser '-')
-	Edge       *EdgePattern `"[" @@ "]"`         // Detalhes dentro dos colchetes
-	RightArrow string       `(@ArrowR | @Punct)` // Captura '->' ou '-' (Punct aqui DEVE ser '-')
+	LeftArrow  string       `parser:"(@ArrowL | @Punct)"` // Captura '<-' ou '-' (Punct aqui DEVE ser '-')
+	Edge       *EdgePattern `parser:"\"[\" @@ \"]\""`     // Detalhes dentro dos colchetes
+	RightArrow string       `parser:"(@ArrowR | @Punct)"` // Captura '->' ou '-' (Punct aqui DEVE ser '-')
 }
 
 type EdgePattern struct {
-	Variable   string      `@Ident?`        // Alias opcional (e.g., 'r' em [r:KNOWS])
-	Type       string      `[ ":" @Ident ]` // Tipo da relação (e.g., 'KNOWS')
-	Properties *Properties `[ @@ ]`
+	Variable   string      `parser:"@Ident?"`          // Alias opcional (e.g., 'r' em [r:KNOWS])
+	Type       string      `parser:"[ \":\" @Ident ]"` // Tipo da relação (e.g., 'KNOWS')
+	Properties *Properties `parser:"[ @@ ]"`
 }
 
 type Properties struct {
-	Entries []*Property `"{" @@ { "," @@ } "}"`
+	Entries []*Property `parser:"\"{\" @@ { \",\" @@ } \"}\""`
 }
 
 type Property struct {
-	Key   string `@Ident ":"`
-	Value string `@String` // Por agora, apenas valores string. Poderia ser estendido.
+	Key   string `parser:"@Ident \":\""`
+	Value string `parser:"@String"` // Por agora, apenas valores string. Poderia ser estendido.
 }
 
 // ==================
@@ -74,26 +74,26 @@ type Property struct {
 // ==================
 
 type WhereClause struct {
-	Cond *Condition `@@`
+	Cond *Condition `parser:"@@"`
 }
 
 type Condition struct {
-	Left     *PropertyAccess `@@`
-	Operator string          `@Operator`
-	Right    string          `@String` // Ou outros tipos de valor
+	Left     *PropertyAccess `parser:"@@"`
+	Operator string          `parser:"@Operator"`
+	Right    string          `parser:"@String"` // Ou outros tipos de valor
 }
 
 type PropertyAccess struct {
-	Object string `@Ident`
-	Dot    string `@Punct` // Captura o '.'
-	Field  string `@Ident`
+	Object string `parser:"@Ident"`
+	Dot    string `parser:"@Punct"` // Captura o '.'
+	Field  string `parser:"@Ident"`
 }
 
 // ==================
 // RETURN
 // ==================
 type ReturnClause struct {
-	Fields []string `@Ident { "," @Ident }`
+	Fields []string `parser:"@Ident { \",\" @Ident }"`
 }
 
 // ==================
