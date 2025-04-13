@@ -11,9 +11,9 @@ import (
 
 type Query struct {
 	Match  *MatchClause  `"MATCH" @@`
+	Create *CreateClause `[ "CREATE" @@ ]`
 	Where  *WhereClause  `[ "WHERE" @@ ]`
 	Return *ReturnClause `"RETURN" @@`
-	Create *CreateClause `[ "CREATE" @@ ]`
 }
 
 // ==================
@@ -55,8 +55,9 @@ type RelationshipPattern struct {
 }
 
 type EdgePattern struct {
-	Variable string `@Ident?`    // Alias opcional (e.g., 'r' em [r:KNOWS])
-	Type     string `":" @Ident` // Tipo da relação (e.g., 'KNOWS')
+	Variable   string      `@Ident?`        // Alias opcional (e.g., 'r' em [r:KNOWS])
+	Type       string      `[ ":" @Ident ]` // Tipo da relação (e.g., 'KNOWS')
+	Properties *Properties `[ @@ ]`
 }
 
 type Properties struct {
