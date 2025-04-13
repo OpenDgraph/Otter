@@ -9,199 +9,207 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMatchReturn(t *testing.T) {
-	parser, err := participle.Build[Query](
+func buildQueryParser(t *testing.T, options ...participle.Option) *participle.Parser[Query] {
+	t.Helper()
+	defaultOptions := []participle.Option{
 		participle.Lexer(myLexer),
-		participle.Elide("Whitespace"),
-	)
+		participle.Elide("Whitespace", "comment", "line_comment"),
+		participle.UseLookahead(2),
+	}
+	parser, err := participle.Build[Query](append(defaultOptions, options...)...)
 	require.NoError(t, err)
+	return parser
+}
 
+func TestMatchReturn(t *testing.T) {
+	parser := buildQueryParser(t) // Usa helper
 	src := `MATCH (n:Person) RETURN n`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	// Match assertions
+	// Match assertions - Updated
 	require.NotNil(t, ast.Match, "Match clause should not be nil")
-	require.NotNil(t, ast.Match.Node, "Match node should not be nil")
-	require.Equal(t, "n", ast.Match.Node.Variable)
-	require.Equal(t, "Person", ast.Match.Node.Label)
-	require.Empty(t, ast.Match.Relations, "Match relations should be empty")
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.NotNil(t, p1.StartNode)
+	require.Equal(t, "n", p1.StartNode.Variable)
+	require.Equal(t, "Person", p1.StartNode.Label)
+	require.Nil(t, p1.StartNode.Properties)
+	require.Len(t, p1.Segments, 0, "Should have no segments")
 
-	// Return assertions
+	// Return assertions - OK
 	require.NotNil(t, ast.Return, "Return clause should not be nil")
 	require.Equal(t, []string{"n"}, ast.Return.Fields)
 }
 
 func TestMatchRelation(t *testing.T) {
-	parser, err := participle.Build[Query](
-		participle.Lexer(myLexer),
-		participle.Elide("Whitespace"),
-	)
-	require.NoError(t, err)
-
+	parser := buildQueryParser(t)
 	src := `MATCH (a:Person)-[:FRIEND]->(b:Person) RETURN a`
 	ast, err := parser.ParseString("", src)
-	b, _ := json.MarshalIndent(ast, "", "  ")
-	fmt.Println("AST JSON:", string(b))
-
 	require.NoError(t, err)
 
-	// Match assertions - start node
-	require.NotNil(t, ast.Match, "Match clause should not be nil")
-	require.NotNil(t, ast.Match.Node, "Match node should not be nil")
-	require.Equal(t, "a", ast.Match.Node.Variable)
-	require.Equal(t, "Person", ast.Match.Node.Label)
+	// Match assertions - Updated
+	require.NotNil(t, ast.Match)
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.NotNil(t, p1.StartNode)
+	require.Equal(t, "a", p1.StartNode.Variable)
+	require.Equal(t, "Person", p1.StartNode.Label)
 
-	// Match assertions - relation segment
-	require.Len(t, ast.Match.Relations, 1, "Should have exactly one relation segment")
-	require.NotNil(t, ast.Match.Relations[0].Edge, "Relation edge should not be nil")
-	require.Equal(t, "FRIEND", ast.Match.Relations[0].Edge.Type)
+	require.Len(t, p1.Segments, 1)
+	seg1 := p1.Segments[0]
+	require.NotNil(t, seg1.Relationship)
+	require.Equal(t, "-", seg1.Relationship.LeftArrow)
+	require.Equal(t, "->", seg1.Relationship.RightArrow)
+	require.NotNil(t, seg1.Relationship.Edge)
+	require.Equal(t, "", seg1.Relationship.Edge.Variable, "Edge variable should be empty when no alias")
+	require.Equal(t, "FRIEND", seg1.Relationship.Edge.Type)
 
-	require.NotNil(t, ast.Match.Relations[0].Node, "Relation destination node should not be nil")
-	require.Equal(t, "b", ast.Match.Relations[0].Node.Variable)
-	require.Equal(t, "Person", ast.Match.Relations[0].Node.Label)
+	require.NotNil(t, seg1.EndNode)
+	require.Equal(t, "b", seg1.EndNode.Variable)
+	require.Equal(t, "Person", seg1.EndNode.Label)
 
-	// Return assertions
-	require.NotNil(t, ast.Return, "Return clause should not be nil")
+	// Return assertions - OK
+	require.NotNil(t, ast.Return)
 	require.Equal(t, []string{"a"}, ast.Return.Fields)
 }
 
 func TestMatchWhereReturn(t *testing.T) {
-	parser, err := participle.Build[Query](
-		participle.Lexer(myLexer),
-		participle.Elide("Whitespace"),
-		participle.Unquote("String"),
-	)
-	require.NoError(t, err)
-
+	// Precisa de Unquote para o valor de Where
+	parser := buildQueryParser(t, participle.Unquote("String"))
 	src := `MATCH (n:Person) WHERE n.name = "Alice" RETURN n`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	// Match assertions
-	require.NotNil(t, ast.Match, "Match clause should not be nil")
-	require.NotNil(t, ast.Match.Node, "Match node should not be nil")
-	require.Equal(t, "n", ast.Match.Node.Variable)
-	require.Equal(t, "Person", ast.Match.Node.Label)
+	// Match assertions - Updated
+	require.NotNil(t, ast.Match)
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.NotNil(t, p1.StartNode)
+	require.Equal(t, "n", p1.StartNode.Variable)
+	require.Equal(t, "Person", p1.StartNode.Label)
+	require.Len(t, p1.Segments, 0)
 
-	// Where clause assertions
+	// Where clause assertions - OK
 	require.NotNil(t, ast.Where, "Where clause should not be nil")
 	require.NotNil(t, ast.Where.Cond, "Condition should not be nil")
 	require.NotNil(t, ast.Where.Cond.Left, "Left side of condition should not be nil")
 	require.Equal(t, "n", ast.Where.Cond.Left.Object)
 	require.Equal(t, "name", ast.Where.Cond.Left.Field)
 	require.Equal(t, "=", ast.Where.Cond.Operator)
-	require.Equal(t, "Alice", ast.Where.Cond.Right)
+	require.Equal(t, "Alice", ast.Where.Cond.Right) // Value is unquoted
 
-	// Return assertions
+	// Return assertions - OK
 	require.NotNil(t, ast.Return, "Return clause should not be nil")
 	require.Equal(t, []string{"n"}, ast.Return.Fields)
 }
-
 func TestMatchNodeWithoutLabel(t *testing.T) {
-	parser, err := participle.Build[Query](
-		participle.Lexer(myLexer),
-		participle.Elide("Whitespace"),
-	)
-	require.NoError(t, err)
-
+	parser := buildQueryParser(t)
 	src := `MATCH (n) RETURN n`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	// Match assertions
+	// Match assertions - Updated
 	require.NotNil(t, ast.Match)
-	require.NotNil(t, ast.Match.Node)
-	require.Equal(t, "n", ast.Match.Node.Variable)
-	require.Equal(t, "", ast.Match.Node.Label, "Label should be empty when not provided")
-	require.Empty(t, ast.Match.Relations)
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.NotNil(t, p1.StartNode)
+	require.Equal(t, "n", p1.StartNode.Variable)
+	require.Equal(t, "", p1.StartNode.Label, "Label should be empty when not provided")
+	require.Len(t, p1.Segments, 0)
 
-	// Return assertions
+	// Return assertions - OK
 	require.NotNil(t, ast.Return)
 	require.Equal(t, []string{"n"}, ast.Return.Fields)
 }
 
 func TestMatchMultipleReturnFields(t *testing.T) {
-	parser, err := participle.Build[Query](
-		participle.Lexer(myLexer),
-		participle.Elide("Whitespace"),
-	)
-	require.NoError(t, err)
-
+	parser := buildQueryParser(t)
 	src := `MATCH (a:User)-[:FOLLOWS]->(b:Topic) RETURN a, b`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	// Match assertions
+	// Match assertions - Updated
 	require.NotNil(t, ast.Match)
-	require.Equal(t, "a", ast.Match.Node.Variable)
-	require.Len(t, ast.Match.Relations, 1)
-	require.Equal(t, "b", ast.Match.Relations[0].Node.Variable)
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.NotNil(t, p1.StartNode)
+	require.Equal(t, "a", p1.StartNode.Variable)
+	require.Equal(t, "User", p1.StartNode.Label)
 
-	// Return assertions
+	require.Len(t, p1.Segments, 1)
+	seg1 := p1.Segments[0]
+	require.NotNil(t, seg1.Relationship)
+	require.Equal(t, "-", seg1.Relationship.LeftArrow)
+	require.Equal(t, "->", seg1.Relationship.RightArrow)
+	require.Equal(t, "FOLLOWS", seg1.Relationship.Edge.Type)
+	require.Equal(t, "", seg1.Relationship.Edge.Variable) // No alias
+
+	require.NotNil(t, seg1.EndNode)
+	require.Equal(t, "b", seg1.EndNode.Variable)
+	require.Equal(t, "Topic", seg1.EndNode.Label)
+
+	// Return assertions - OK
 	require.NotNil(t, ast.Return)
 	require.Equal(t, []string{"a", "b"}, ast.Return.Fields, "Should return multiple fields")
 }
 
 func TestMatchLongerPath(t *testing.T) {
-	parser, err := participle.Build[Query](
-		participle.Lexer(myLexer),
-		participle.Elide("Whitespace"),
-	)
-	require.NoError(t, err)
-
+	parser := buildQueryParser(t)
 	src := `MATCH (a:Start)-[:REL_ONE]->(b:Middle)-[:REL_TWO]->(c:End) RETURN c`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	// Start node
+	// Match assertions - Updated
 	require.NotNil(t, ast.Match)
-	require.NotNil(t, ast.Match.Node)
-	require.Equal(t, "a", ast.Match.Node.Variable)
-	require.Equal(t, "Start", ast.Match.Node.Label)
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.NotNil(t, p1.StartNode)
+	require.Equal(t, "a", p1.StartNode.Variable)
+	require.Equal(t, "Start", p1.StartNode.Label)
 
-	// Two path segments
-	require.Len(t, ast.Match.Relations, 2, "Should have two relation segments")
+	require.Len(t, p1.Segments, 2, "Should have two relation segments")
 
-	// First relation
-	require.NotNil(t, ast.Match.Relations[0])
-	require.NotNil(t, ast.Match.Relations[0].Edge)
-	require.Equal(t, "REL_ONE", ast.Match.Relations[0].Edge.Type)
-	require.NotNil(t, ast.Match.Relations[0].Node)
-	require.Equal(t, "b", ast.Match.Relations[0].Node.Variable)
-	require.Equal(t, "Middle", ast.Match.Relations[0].Node.Label)
+	// First segment
+	seg1 := p1.Segments[0]
+	require.NotNil(t, seg1.Relationship)
+	require.Equal(t, "-", seg1.Relationship.LeftArrow)
+	require.Equal(t, "->", seg1.Relationship.RightArrow)
+	require.Equal(t, "REL_ONE", seg1.Relationship.Edge.Type)
+	require.NotNil(t, seg1.EndNode)
+	require.Equal(t, "b", seg1.EndNode.Variable)
+	require.Equal(t, "Middle", seg1.EndNode.Label)
 
-	// Second relation
-	require.NotNil(t, ast.Match.Relations[1])
-	require.NotNil(t, ast.Match.Relations[1].Edge)
-	require.Equal(t, "REL_TWO", ast.Match.Relations[1].Edge.Type)
-	require.NotNil(t, ast.Match.Relations[1].Node)
-	require.Equal(t, "c", ast.Match.Relations[1].Node.Variable)
-	require.Equal(t, "End", ast.Match.Relations[1].Node.Label)
+	// Second segment
+	seg2 := p1.Segments[1]
+	require.NotNil(t, seg2.Relationship)
+	require.Equal(t, "-", seg2.Relationship.LeftArrow)
+	require.Equal(t, "->", seg2.Relationship.RightArrow)
+	require.Equal(t, "REL_TWO", seg2.Relationship.Edge.Type)
+	require.NotNil(t, seg2.EndNode)
+	require.Equal(t, "c", seg2.EndNode.Variable)
+	require.Equal(t, "End", seg2.EndNode.Label)
 
-	// Return
+	// Return - OK
 	require.NotNil(t, ast.Return)
 	require.Equal(t, []string{"c"}, ast.Return.Fields)
 }
 
 func TestMatchWhereDifferentOperator(t *testing.T) {
-	parser, err := participle.Build[Query](
-		participle.Lexer(myLexer),
-		participle.Elide("Whitespace"),
-		participle.Unquote("String"),
-	)
-	require.NoError(t, err)
-
+	parser := buildQueryParser(t, participle.Unquote("String"))
 	src := `MATCH (p:Product) WHERE p.stock > "0" RETURN p`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	// Match
+	// Match - Updated
 	require.NotNil(t, ast.Match)
-	require.Equal(t, "p", ast.Match.Node.Variable)
-	require.Equal(t, "Product", ast.Match.Node.Label)
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.Equal(t, "p", p1.StartNode.Variable)
+	require.Equal(t, "Product", p1.StartNode.Label)
+	require.Len(t, p1.Segments, 0)
 
-	// Where
+	// Where - OK
 	require.NotNil(t, ast.Where)
 	require.NotNil(t, ast.Where.Cond)
 	require.NotNil(t, ast.Where.Cond.Left)
@@ -210,33 +218,33 @@ func TestMatchWhereDifferentOperator(t *testing.T) {
 	require.Equal(t, ">", ast.Where.Cond.Operator)
 	require.Equal(t, "0", ast.Where.Cond.Right)
 
-	// Return
+	// Return - OK
 	require.NotNil(t, ast.Return)
 	require.Equal(t, []string{"p"}, ast.Return.Fields)
 }
 
 func TestMatchLongPathWithWhereAndMultipleReturn(t *testing.T) {
-	parser, err := participle.Build[Query](
-		participle.Lexer(myLexer),
-		participle.Elide("Whitespace"),
-		participle.Unquote("String"),
-	)
-	require.NoError(t, err)
-
+	parser := buildQueryParser(t, participle.Unquote("String"))
 	src := `MATCH (u:User)-[:WROTE]->(a:Article) WHERE a.status = "published" RETURN u, a`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	// Match
+	// Match - Updated
 	require.NotNil(t, ast.Match)
-	require.Equal(t, "u", ast.Match.Node.Variable)
-	require.Equal(t, "User", ast.Match.Node.Label)
-	require.Len(t, ast.Match.Relations, 1)
-	require.Equal(t, "WROTE", ast.Match.Relations[0].Edge.Type)
-	require.Equal(t, "a", ast.Match.Relations[0].Node.Variable)
-	require.Equal(t, "Article", ast.Match.Relations[0].Node.Label)
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.Equal(t, "u", p1.StartNode.Variable)
+	require.Equal(t, "User", p1.StartNode.Label)
 
-	// Where
+	require.Len(t, p1.Segments, 1)
+	seg1 := p1.Segments[0]
+	require.Equal(t, "-", seg1.Relationship.LeftArrow)
+	require.Equal(t, "->", seg1.Relationship.RightArrow)
+	require.Equal(t, "WROTE", seg1.Relationship.Edge.Type)
+	require.Equal(t, "a", seg1.EndNode.Variable)
+	require.Equal(t, "Article", seg1.EndNode.Label)
+
+	// Where - OK
 	require.NotNil(t, ast.Where)
 	require.NotNil(t, ast.Where.Cond)
 	require.Equal(t, "a", ast.Where.Cond.Left.Object)
@@ -244,18 +252,13 @@ func TestMatchLongPathWithWhereAndMultipleReturn(t *testing.T) {
 	require.Equal(t, "=", ast.Where.Cond.Operator)
 	require.Equal(t, "published", ast.Where.Cond.Right)
 
-	// Return
+	// Return - OK
 	require.NotNil(t, ast.Return)
 	require.Equal(t, []string{"u", "a"}, ast.Return.Fields)
 }
 
 func TestMatchWithVariedSpacing(t *testing.T) {
-	parser, err := participle.Build[Query](
-		participle.Lexer(myLexer),
-		participle.Elide("Whitespace"),
-	)
-	require.NoError(t, err)
-
+	parser := buildQueryParser(t)
 	src := `
         MATCH ( a : Person ) - [ : FRIEND ] -> ( b : Person )
         RETURN a
@@ -263,16 +266,204 @@ func TestMatchWithVariedSpacing(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err, "Parser should handle varied whitespace")
 
+	// Match assertions - Updated (Same as TestMatchRelation)
 	require.NotNil(t, ast.Match)
-	require.NotNil(t, ast.Match.Node)
-	require.Equal(t, "a", ast.Match.Node.Variable)
-	require.Equal(t, "Person", ast.Match.Node.Label)
-	require.Len(t, ast.Match.Relations, 1)
-	require.NotNil(t, ast.Match.Relations[0])
-	require.NotNil(t, ast.Match.Relations[0].Edge)
-	require.Equal(t, "FRIEND", ast.Match.Relations[0].Edge.Type)
-	require.NotNil(t, ast.Match.Relations[0].Node)
-	require.Equal(t, "b", ast.Match.Relations[0].Node.Variable)
-	require.Equal(t, "Person", ast.Match.Relations[0].Node.Label)
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.NotNil(t, p1.StartNode)
+	require.Equal(t, "a", p1.StartNode.Variable)
+	require.Equal(t, "Person", p1.StartNode.Label)
+
+	require.Len(t, p1.Segments, 1)
+	seg1 := p1.Segments[0]
+	require.NotNil(t, seg1.Relationship)
+	require.Equal(t, "-", seg1.Relationship.LeftArrow)
+	require.Equal(t, "->", seg1.Relationship.RightArrow)
+	require.NotNil(t, seg1.Relationship.Edge)
+	require.Equal(t, "", seg1.Relationship.Edge.Variable)
+	require.Equal(t, "FRIEND", seg1.Relationship.Edge.Type)
+
+	require.NotNil(t, seg1.EndNode)
+	require.Equal(t, "b", seg1.EndNode.Variable)
+	require.Equal(t, "Person", seg1.EndNode.Label)
+
+	// Return assertions - OK
 	require.NotNil(t, ast.Return)
 	require.Equal(t, []string{"a"}, ast.Return.Fields)
+}
+
+func TestMatchWithReverseRelation(t *testing.T) {
+	parser := buildQueryParser(t)
+	src := `MATCH (a)<-[:FOLLOWS]-(b) RETURN a, b`
+	ast, err := parser.ParseString("", src)
+	// b, _ := json.MarshalIndent(ast, "", "  ") // Debug
+	// fmt.Println("AST JSON (Reverse):", string(b)) // Debug
+	require.NoError(t, err)
+
+	require.NotNil(t, ast.Match)
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.Equal(t, "a", p1.StartNode.Variable) // Nó inicial é 'a'
+	require.Len(t, p1.Segments, 1)
+	seg1 := p1.Segments[0]
+	require.Equal(t, "<-", seg1.Relationship.LeftArrow) // Verifica seta esquerda
+	require.Equal(t, "-", seg1.Relationship.RightArrow)
+	require.Equal(t, "FOLLOWS", seg1.Relationship.Edge.Type)
+	require.Equal(t, "b", seg1.EndNode.Variable)
+
+	require.NotNil(t, ast.Return)
+	require.Equal(t, []string{"a", "b"}, ast.Return.Fields)
+}
+func TestMatchWithMultiplePatterns(t *testing.T) {
+	parser := buildQueryParser(t)
+	src := `MATCH (a:User), (b:User) RETURN a, b`
+	ast, err := parser.ParseString("", src)
+	// b, _ := json.MarshalIndent(ast, "", "  ") // Debug
+	// fmt.Println("AST JSON (MultiPattern):", string(b)) // Debug
+	require.NoError(t, err)
+
+	require.NotNil(t, ast.Match)
+	require.Len(t, ast.Match.Patterns, 2) // Verifica se há dois patterns
+
+	// Pattern 1
+	p1 := ast.Match.Patterns[0]
+	require.Equal(t, "a", p1.StartNode.Variable)
+	require.Equal(t, "User", p1.StartNode.Label)
+	require.Len(t, p1.Segments, 0)
+
+	// Pattern 2
+	p2 := ast.Match.Patterns[1]
+	require.Equal(t, "b", p2.StartNode.Variable)
+	require.Equal(t, "User", p2.StartNode.Label)
+	require.Len(t, p2.Segments, 0)
+
+	require.NotNil(t, ast.Return)
+	require.Equal(t, []string{"a", "b"}, ast.Return.Fields)
+}
+
+func TestReturnWithPropertyAccess(t *testing.T) {
+	parser, err := participle.Build[Query](
+		participle.Lexer(myLexer),
+		participle.Elide("Whitespace"),
+	)
+	require.NoError(t, err)
+
+	src := `MATCH (n:Person) RETURN n.name`
+	ast, err := parser.ParseString("", src)
+	b, _ := json.MarshalIndent(ast, "", "  ")
+	fmt.Println("AST JSON:", string(b))
+	require.Error(t, err, "Property access in RETURN is not supported yet")
+}
+
+func TestWhereWithLogicalOperators(t *testing.T) {
+	parser, err := participle.Build[Query](
+		participle.Lexer(myLexer),
+		participle.Elide("Whitespace"),
+		participle.Unquote("String"),
+	)
+	require.NoError(t, err)
+
+	src := `MATCH (a) WHERE a.name = "Alice" AND a.age > "30" RETURN a`
+	ast, err := parser.ParseString("", src)
+	b, _ := json.MarshalIndent(ast, "", "  ")
+	fmt.Println("AST JSON:", string(b))
+	require.Error(t, err, "Logical operators (AND/OR) not supported yet")
+}
+
+func TestMatchWithNodeProperties(t *testing.T) {
+	parser := buildQueryParser(t, participle.Unquote("String")) // Precisa Unquote para valor
+	src := `MATCH (n:Person {name: "Alice"}) RETURN n`
+	ast, err := parser.ParseString("", src)
+	// b, _ := json.MarshalIndent(ast, "", "  ") // Debug
+	// fmt.Println("AST JSON (NodeProps):", string(b)) // Debug
+	require.NoError(t, err)
+
+	require.NotNil(t, ast.Match)
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.Equal(t, "n", p1.StartNode.Variable)
+	require.Equal(t, "Person", p1.StartNode.Label)
+	require.Len(t, p1.Segments, 0)
+
+	require.NotNil(t, p1.StartNode.Properties) // Verifica se as propriedades existem
+	require.Len(t, p1.StartNode.Properties.Entries, 1)
+	require.Equal(t, "name", p1.StartNode.Properties.Entries[0].Key)
+	require.Equal(t, "Alice", p1.StartNode.Properties.Entries[0].Value) // Valor sem aspas
+
+	require.NotNil(t, ast.Return)
+	require.Equal(t, []string{"n"}, ast.Return.Fields)
+}
+
+func TestRelationWithAlias(t *testing.T) {
+	parser := buildQueryParser(t)
+	src := `MATCH (a)-[r:KNOWS]->(b) RETURN r`
+	ast, err := parser.ParseString("", src)
+	require.NoError(t, err)
+
+	// Match assertions - Updated
+	require.NotNil(t, ast.Match)
+	require.Len(t, ast.Match.Patterns, 1)
+	p1 := ast.Match.Patterns[0]
+	require.NotNil(t, p1.StartNode)
+	require.Equal(t, "a", p1.StartNode.Variable)
+	require.Equal(t, "", p1.StartNode.Label) // Sem label
+
+	require.Len(t, p1.Segments, 1)
+	seg1 := p1.Segments[0]
+	require.NotNil(t, seg1.Relationship)
+	require.Equal(t, "-", seg1.Relationship.LeftArrow)
+	require.Equal(t, "->", seg1.Relationship.RightArrow)
+	require.NotNil(t, seg1.Relationship.Edge)
+	require.Equal(t, "r", seg1.Relationship.Edge.Variable, "Edge variable (alias) should be 'r'") // <<== Verifica o alias
+	require.Equal(t, "KNOWS", seg1.Relationship.Edge.Type, "Edge type should be 'KNOWS'")
+
+	require.NotNil(t, seg1.EndNode)
+	require.Equal(t, "b", seg1.EndNode.Variable)
+	require.Equal(t, "", seg1.EndNode.Label) // Sem label
+
+	// Return assertions - OK
+	require.NotNil(t, ast.Return)
+	require.Equal(t, []string{"r"}, ast.Return.Fields, "Return field should be the alias 'r'")
+}
+
+func TestInvalidQueryMissingParenthesis(t *testing.T) {
+	parser, err := participle.Build[Query](
+		participle.Lexer(myLexer),
+		participle.Elide("Whitespace"),
+	)
+	require.NoError(t, err)
+
+	src := `MATCH a:Person) RETURN a`
+	ast, err := parser.ParseString("", src)
+	b, _ := json.MarshalIndent(ast, "", "  ")
+	fmt.Println("AST JSON:", string(b))
+	require.Error(t, err, "Missing parenthesis should result in parse error")
+}
+
+func TestInvalidQueryWhereWithoutMatch(t *testing.T) {
+	parser, err := participle.Build[Query](
+		participle.Lexer(myLexer),
+		participle.Elide("Whitespace"),
+	)
+	require.NoError(t, err)
+
+	src := `WHERE name = "Alice" RETURN n`
+	ast, err := parser.ParseString("", src)
+	b, _ := json.MarshalIndent(ast, "", "  ")
+	fmt.Println("AST JSON:", string(b))
+	require.Error(t, err, "WHERE without MATCH should fail")
+}
+
+func TestInvalidQueryReturnOnly(t *testing.T) {
+	parser, err := participle.Build[Query](
+		participle.Lexer(myLexer),
+		participle.Elide("Whitespace"),
+	)
+	require.NoError(t, err)
+
+	src := `RETURN n`
+	ast, err := parser.ParseString("", src)
+	b, _ := json.MarshalIndent(ast, "", "  ")
+	fmt.Println("AST JSON:", string(b))
+	require.Error(t, err, "RETURN without MATCH should fail")
+}
