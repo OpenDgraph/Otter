@@ -1,6 +1,9 @@
 package parsing
 
-import "github.com/alecthomas/participle/v2/lexer"
+import (
+	"github.com/alecthomas/participle/v2"
+	"github.com/alecthomas/participle/v2/lexer"
+)
 
 // ==================
 // AST
@@ -10,6 +13,15 @@ type Query struct {
 	Match  *MatchClause  `"MATCH" @@`
 	Where  *WhereClause  `[ "WHERE" @@ ]`
 	Return *ReturnClause `"RETURN" @@`
+	Create *CreateClause `[ "CREATE" @@ ]`
+}
+
+// ==================
+// CREATE
+// ==================
+
+type CreateClause struct {
+	Patterns []*Pattern `@@ { "," @@ }`
 }
 
 // ==================
@@ -27,7 +39,7 @@ type Pattern struct {
 
 type NodePattern struct {
 	Variable   string      `@Ident`
-	Label      string      `[ ":" @Ident ]`
+	Label      string      `[ ":" @(Ident | Keyword) ]`
 	Properties *Properties `[ @@ ]` // Propriedades são opcionais e definidas em sua própria struct
 }
 
@@ -88,13 +100,38 @@ type ReturnClause struct {
 // ==================
 
 var myLexer = lexer.MustSimple([]lexer.SimpleRule{
+	{Name: "Keyword", Pattern: `(?i)\b(MATCH|RETURN|WHERE|AND|OR|NOT|NULL|TRUE|FALSE|IN|IS|AS|WITH|UNWIND|OPTIONAL|DETACH|DELETE|SET|CREATE|MERGE|ON|CASE|WHEN|THEN|ELSE|DISTINCT|ORDER|BY|SKIP|LIMIT|ASC|DESC)\b`},
 	{Name: "ArrowL", Pattern: `<-`},
 	{Name: "ArrowR", Pattern: `->`},
 	{Name: "Ident", Pattern: `[a-zA-Z_][a-zA-Z0-9_]*`},
-	{Name: "String", Pattern: `"[^"]*"`},
+	{Name: "String", Pattern: `'[^']*'|"[^"]*"`},
 	{Name: "Operator", Pattern: `<>|<=|>=|=|<|>`},
 	{Name: "Punct", Pattern: `[-:\[\]\(\),\{\}.]`},
 	{Name: "Whitespace", Pattern: `\s+`},
 	{Name: "comment", Pattern: `/\*.*?\*/`},
 	{Name: "line_comment", Pattern: `//[^\n]*`},
 })
+
+func BuildParser[T any](options ...participle.Option) *participle.Parser[T] {
+	defaultOptions := []participle.Option{
+		participle.Lexer(myLexer),
+		participle.Unquote("String"),
+		participle.Elide("Whitespace", "comment", "line_comment"),
+		participle.CaseInsensitive("Keyword"),
+		participle.UseLookahead(2),
+	}
+	return participle.MustBuild[T](append(defaultOptions, options...)...)
+}
+
+func BuildQueryParser(options ...participle.Option) *participle.Parser[Query] {
+	defaultOptions := []participle.Option{
+		participle.Lexer(myLexer),
+		participle.Unquote("String"),
+		participle.Elide("Whitespace", "comment", "line_comment"),
+		participle.CaseInsensitive("Keyword"),
+		participle.UseLookahead(2),
+	}
+	parser := participle.MustBuild[Query](append(defaultOptions, options...)...)
+
+	return parser
+}

@@ -9,20 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func buildQueryParser(t *testing.T, options ...participle.Option) *participle.Parser[Query] {
-	t.Helper()
-	defaultOptions := []participle.Option{
-		participle.Lexer(myLexer),
-		participle.Elide("Whitespace", "comment", "line_comment"),
-		participle.UseLookahead(2),
-	}
-	parser, err := participle.Build[Query](append(defaultOptions, options...)...)
-	require.NoError(t, err)
-	return parser
-}
-
 func TestMatchReturn(t *testing.T) {
-	parser := buildQueryParser(t) // Usa helper
+	parser := BuildParser[Query]()
 	src := `MATCH (n:Person) RETURN n`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
@@ -43,7 +31,7 @@ func TestMatchReturn(t *testing.T) {
 }
 
 func TestMatchRelation(t *testing.T) {
-	parser := buildQueryParser(t)
+	parser := BuildParser[Query]()
 	src := `MATCH (a:Person)-[:FRIEND]->(b:Person) RETURN a`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
@@ -76,7 +64,7 @@ func TestMatchRelation(t *testing.T) {
 
 func TestMatchWhereReturn(t *testing.T) {
 	// Precisa de Unquote para o valor de Where
-	parser := buildQueryParser(t, participle.Unquote("String"))
+	parser := BuildParser[Query]()
 	src := `MATCH (n:Person) WHERE n.name = "Alice" RETURN n`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
@@ -104,7 +92,7 @@ func TestMatchWhereReturn(t *testing.T) {
 	require.Equal(t, []string{"n"}, ast.Return.Fields)
 }
 func TestMatchNodeWithoutLabel(t *testing.T) {
-	parser := buildQueryParser(t)
+	parser := BuildParser[Query]()
 	src := `MATCH (n) RETURN n`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
@@ -124,7 +112,7 @@ func TestMatchNodeWithoutLabel(t *testing.T) {
 }
 
 func TestMatchMultipleReturnFields(t *testing.T) {
-	parser := buildQueryParser(t)
+	parser := BuildParser[Query]()
 	src := `MATCH (a:User)-[:FOLLOWS]->(b:Topic) RETURN a, b`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
@@ -155,7 +143,7 @@ func TestMatchMultipleReturnFields(t *testing.T) {
 }
 
 func TestMatchLongerPath(t *testing.T) {
-	parser := buildQueryParser(t)
+	parser := BuildParser[Query]()
 	src := `MATCH (a:Start)-[:REL_ONE]->(b:Middle)-[:REL_TWO]->(c:End) RETURN c`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
@@ -196,7 +184,7 @@ func TestMatchLongerPath(t *testing.T) {
 }
 
 func TestMatchWhereDifferentOperator(t *testing.T) {
-	parser := buildQueryParser(t, participle.Unquote("String"))
+	parser := BuildParser[Query]()
 	src := `MATCH (p:Product) WHERE p.stock > "0" RETURN p`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
@@ -224,7 +212,7 @@ func TestMatchWhereDifferentOperator(t *testing.T) {
 }
 
 func TestMatchLongPathWithWhereAndMultipleReturn(t *testing.T) {
-	parser := buildQueryParser(t, participle.Unquote("String"))
+	parser := BuildParser[Query]()
 	src := `MATCH (u:User)-[:WROTE]->(a:Article) WHERE a.status = "published" RETURN u, a`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
@@ -258,7 +246,7 @@ func TestMatchLongPathWithWhereAndMultipleReturn(t *testing.T) {
 }
 
 func TestMatchWithVariedSpacing(t *testing.T) {
-	parser := buildQueryParser(t)
+	parser := BuildParser[Query]()
 	src := `
         MATCH ( a : Person ) - [ : FRIEND ] -> ( b : Person )
         RETURN a
@@ -293,7 +281,7 @@ func TestMatchWithVariedSpacing(t *testing.T) {
 }
 
 func TestMatchWithReverseRelation(t *testing.T) {
-	parser := buildQueryParser(t)
+	parser := BuildParser[Query]()
 	src := `MATCH (a)<-[:FOLLOWS]-(b) RETURN a, b`
 	ast, err := parser.ParseString("", src)
 	// b, _ := json.MarshalIndent(ast, "", "  ") // Debug
@@ -315,7 +303,7 @@ func TestMatchWithReverseRelation(t *testing.T) {
 	require.Equal(t, []string{"a", "b"}, ast.Return.Fields)
 }
 func TestMatchWithMultiplePatterns(t *testing.T) {
-	parser := buildQueryParser(t)
+	parser := BuildParser[Query]()
 	src := `MATCH (a:User), (b:User) RETURN a, b`
 	ast, err := parser.ParseString("", src)
 	// b, _ := json.MarshalIndent(ast, "", "  ") // Debug
@@ -371,7 +359,7 @@ func TestWhereWithLogicalOperators(t *testing.T) {
 }
 
 func TestMatchWithNodeProperties(t *testing.T) {
-	parser := buildQueryParser(t, participle.Unquote("String")) // Precisa Unquote para valor
+	parser := BuildParser[Query]() // Precisa Unquote para valor
 	src := `MATCH (n:Person {name: "Alice"}) RETURN n`
 	ast, err := parser.ParseString("", src)
 	// b, _ := json.MarshalIndent(ast, "", "  ") // Debug
@@ -395,7 +383,7 @@ func TestMatchWithNodeProperties(t *testing.T) {
 }
 
 func TestRelationWithAlias(t *testing.T) {
-	parser := buildQueryParser(t)
+	parser := BuildParser[Query]()
 	src := `MATCH (a)-[r:KNOWS]->(b) RETURN r`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
