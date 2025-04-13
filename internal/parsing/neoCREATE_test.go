@@ -12,6 +12,12 @@ func TestCreateSingleNode(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
+	saveASTSnapshot(t, ASTSnapshot{
+		Test:  t.Name(),
+		Input: src,
+		AST:   ast,
+	}, "testdata/asts.json")
+
 	// Verificar Match (mínimo)
 	require.NotNil(t, ast.Match)
 	require.Len(t, ast.Match.Patterns, 1)
@@ -46,6 +52,12 @@ func TestMatchAndCreate(t *testing.T) {
     `
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
+
+	saveASTSnapshot(t, ASTSnapshot{
+		Test:  t.Name(),
+		Input: src,
+		AST:   ast,
+	}, "testdata/asts.json")
 
 	// Verificar Match
 	require.NotNil(t, ast.Match)

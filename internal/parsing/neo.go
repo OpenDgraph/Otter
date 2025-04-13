@@ -1,8 +1,12 @@
 package parsing
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+	"testing"
 
 	"github.com/alecthomas/participle/v2"
 )
@@ -108,5 +112,36 @@ func ParseQueryParts(query string) (*MatchClause, *WhereClause, *ReturnClause, e
 		}
 
 		return matchClause, whereClause, returnClause, nil
+	}
+}
+
+type ASTSnapshot struct {
+	Test  string      `json:"test"`
+	Input string      `json:"input"`
+	AST   interface{} `json:"ast"`
+}
+
+func saveASTSnapshot(t *testing.T, snapshot ASTSnapshot, path string) {
+	t.Helper()
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("failed to create directory %s: %v", dir, err)
+	}
+
+	var snapshots []ASTSnapshot
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &snapshots)
+	}
+
+	snapshots = append(snapshots, snapshot)
+
+	data, err := json.MarshalIndent(snapshots, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to marshal snapshot: %v", err)
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		t.Fatalf("failed to write snapshot file: %v", err)
 	}
 }

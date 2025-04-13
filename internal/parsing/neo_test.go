@@ -15,6 +15,12 @@ func TestMatchReturn(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
+	saveASTSnapshot(t, ASTSnapshot{
+		Test:  t.Name(),
+		Input: src,
+		AST:   ast,
+	}, "testdata/asts.json")
+
 	// Match assertions - Updated
 	require.NotNil(t, ast.Match, "Match clause should not be nil")
 	require.Len(t, ast.Match.Patterns, 1)
@@ -35,6 +41,12 @@ func TestMatchRelation(t *testing.T) {
 	src := `MATCH (a:Person)-[:FRIEND]->(b:Person) RETURN a`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
+
+	saveASTSnapshot(t, ASTSnapshot{
+		Test:  t.Name(),
+		Input: src,
+		AST:   ast,
+	}, "testdata/asts.json")
 
 	// Match assertions - Updated
 	require.NotNil(t, ast.Match)
@@ -69,6 +81,12 @@ func TestMatchWhereReturn(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
+	saveASTSnapshot(t, ASTSnapshot{
+		Test:  t.Name(),
+		Input: src,
+		AST:   ast,
+	}, "testdata/asts.json")
+
 	// Match assertions - Updated
 	require.NotNil(t, ast.Match)
 	require.Len(t, ast.Match.Patterns, 1)
@@ -97,6 +115,12 @@ func TestMatchNodeWithoutLabel(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
+	saveASTSnapshot(t, ASTSnapshot{
+		Test:  t.Name(),
+		Input: src,
+		AST:   ast,
+	}, "testdata/asts.json")
+
 	// Match assertions - Updated
 	require.NotNil(t, ast.Match)
 	require.Len(t, ast.Match.Patterns, 1)
@@ -116,6 +140,12 @@ func TestMatchMultipleReturnFields(t *testing.T) {
 	src := `MATCH (a:User)-[:FOLLOWS]->(b:Topic) RETURN a, b`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
+
+	saveASTSnapshot(t, ASTSnapshot{
+		Test:  t.Name(),
+		Input: src,
+		AST:   ast,
+	}, "testdata/asts.json")
 
 	// Match assertions - Updated
 	require.NotNil(t, ast.Match)
@@ -147,6 +177,12 @@ func TestMatchLongerPath(t *testing.T) {
 	src := `MATCH (a:Start)-[:REL_ONE]->(b:Middle)-[:REL_TWO]->(c:End) RETURN c`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
+
+	saveASTSnapshot(t, ASTSnapshot{
+		Test:  t.Name(),
+		Input: src,
+		AST:   ast,
+	}, "testdata/asts.json")
 
 	// Match assertions - Updated
 	require.NotNil(t, ast.Match)
@@ -189,6 +225,12 @@ func TestMatchWhereDifferentOperator(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
+	saveASTSnapshot(t, ASTSnapshot{
+		Test:  t.Name(),
+		Input: src,
+		AST:   ast,
+	}, "testdata/asts.json")
+
 	// Match - Updated
 	require.NotNil(t, ast.Match)
 	require.Len(t, ast.Match.Patterns, 1)
@@ -216,6 +258,12 @@ func TestMatchLongPathWithWhereAndMultipleReturn(t *testing.T) {
 	src := `MATCH (u:User)-[:WROTE]->(a:Article) WHERE a.status = "published" RETURN u, a`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
+
+	saveASTSnapshot(t, ASTSnapshot{
+		Test:  t.Name(),
+		Input: src,
+		AST:   ast,
+	}, "testdata/asts.json")
 
 	// Match - Updated
 	require.NotNil(t, ast.Match)
@@ -387,6 +435,12 @@ func TestRelationWithAlias(t *testing.T) {
 	src := `MATCH (a)-[r:KNOWS]->(b) RETURN r`
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
+
+	saveASTSnapshot(t, ASTSnapshot{
+		Test:  t.Name(),
+		Input: src,
+		AST:   ast,
+	}, "testdata/asts.json")
 
 	// Match assertions - Updated
 	require.NotNil(t, ast.Match)
