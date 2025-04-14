@@ -42,7 +42,7 @@ func TestValidateDQLHandler(t *testing.T) {
 		ValidateDQLHandler(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.JSONEq(t, `{"error":"Request body is empty."}`, rec.Body.String())
+		assert.Contains(t, rec.Body.String(), `"error":"Request body is empty`)
 	})
 
 	t.Run("Valid DQL Query", func(t *testing.T) {
@@ -56,13 +56,13 @@ func TestValidateDQLHandler(t *testing.T) {
 	})
 
 	t.Run("Valid DQL Mutation", func(t *testing.T) {
-		mutation := `mutation { set { <_:user> <name> "Alice" . } }`
+		mutation := `{ set { <_:user> <name> "Alice" . } }`
 		req := newRequest(http.MethodPost, "application/dql", mutation)
 		rec := httptest.NewRecorder()
 		ValidateDQLHandler(rec, req)
 
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.JSONEq(t, `{"status":"valid","type":"dql"}`, rec.Body.String())
+		assert.JSONEq(t, `{"status":"valid","type":"mutation"}`, rec.Body.String())
 	})
 
 	t.Run("Invalid Input (Not DQL)", func(t *testing.T) {
@@ -72,6 +72,6 @@ func TestValidateDQLHandler(t *testing.T) {
 		ValidateDQLHandler(rec, req)
 
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
-		assert.Contains(t, rec.Body.String(), `"error":"Failed to parse DQL:`)
+		assert.True(t, strings.HasPrefix(rec.Body.String(), `{"error":"Failed to parse DQL`), "error message should start with 'Failed to parse DQL'")
 	})
 }

@@ -24,16 +24,16 @@ func main() {
 
 	switch cfg.BalancerType {
 	case "defined", "purposeful":
-		balancer := loadbalancer.NewPurposefulBalancer(cfg.Groups)
+		balancer := loadbalancer.NewPurposefulBalancer(*cfg)
 		fmt.Println("Using purposeful balancer")
-		proxyInstance, err = proxy.NewPurposefulProxy(balancer, cfg.DgraphUser, cfg.DgraphPassword)
+		proxyInstance, err = proxy.NewPurposefulProxy(balancer, *cfg)
 	default:
 		var balancer loadbalancer.Balancer
-		balancer, err = loadbalancer.NewBalancer(cfg.BalancerType, cfg.DgraphEndpoints)
+		balancer, err = loadbalancer.NewBalancer(*cfg)
 		if err != nil {
 			log.Fatalf("Error creating balancer: %v", err)
 		}
-		proxyInstance, err = proxy.NewProxy(balancer, cfg.DgraphEndpoints, cfg.DgraphUser, cfg.DgraphPassword)
+		proxyInstance, err = proxy.NewProxy(balancer, *cfg)
 	}
 
 	if err != nil {
@@ -45,7 +45,7 @@ func main() {
 	}
 
 	// Proxy HTTP server
-	if cfg.EnableHTTP {
+	if cfg.EnableHTTP != nil {
 		mux := http.NewServeMux()
 		mux.Handle("/", routing.SetupRoutes(proxyInstance))
 
@@ -59,7 +59,7 @@ func main() {
 	}
 
 	// WebSocket server
-	if cfg.EnableWebSocket {
+	if cfg.EnableWebSocket != nil {
 		wsMux := http.NewServeMux()
 		wsMux.HandleFunc("/ws", websocket.HandleWebSocketWithProxy(proxyInstance))
 		log.Printf("Starting websocket server on port %d\n", cfg.WebSocketPort)
@@ -68,7 +68,7 @@ func main() {
 		log.Println("WebSocket server disabled.")
 	}
 
-	if !cfg.EnableHTTP && !cfg.EnableWebSocket {
+	if cfg.EnableHTTP != nil && cfg.EnableWebSocket != nil {
 		log.Fatal("Both HTTP and WebSocket servers are disabled. Nothing to run.")
 	}
 

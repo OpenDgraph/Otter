@@ -31,7 +31,7 @@ func ValidateDQLHandler(w http.ResponseWriter, r *http.Request) {
 	// Try parsing as query
 	queryResult, queryErr := parsing.ParseQuery(dqlStr)
 	if queryErr == nil && len(queryResult.Query) > 0 {
-		writeValidationResponse(w, "query")
+		writeValidationResponse(w, "dql")
 		return
 	}
 

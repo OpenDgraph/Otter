@@ -1,6 +1,9 @@
 package parsing
 
-import "testing"
+import (
+	"log"
+	"testing"
+)
 
 func TestParse(t *testing.T) {
 	query := `
@@ -14,4 +17,10 @@ func TestParse(t *testing.T) {
 	if err != nil {
 		t.Errorf("Parse(%v) = %v; want nil", AST, err)
 	}
+	newquery := RenderQuery(AST, "user")
+	SaveDQLSnapshotFile("basic query", query, AST, "snapshots/dql_ast.json", newquery)
+	if err != nil {
+		log.Fatalf("Erro Saving the snapshot: %v", err)
+	}
+
 }
