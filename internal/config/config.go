@@ -19,6 +19,7 @@ type Config struct {
 	DgraphUser      string              `yaml:"dgraph_user"`
 	DgraphPassword  string              `yaml:"dgraph_password"`
 	EnableHTTP      bool                `yaml:"enable_http"`
+	GraphQL         bool                `yaml:"graphql"`
 	EnableWebSocket bool                `yaml:"enable_websocket"`
 }
 
@@ -39,6 +40,12 @@ func LoadConfig() (*Config, error) {
 		cfg.EnableHTTP = val != "false"
 	} else if !cfg.EnableHTTP { // default true if undefined in YAML
 		cfg.EnableHTTP = true
+	}
+
+	if val := os.Getenv("GRAPHQL"); val != "" {
+		cfg.GraphQL = val != "false"
+	} else if !cfg.GraphQL {
+		cfg.GraphQL = true
 	}
 
 	if val := os.Getenv("ENABLE_WEBSOCKET"); val != "" {
