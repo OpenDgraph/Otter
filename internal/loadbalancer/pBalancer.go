@@ -1,6 +1,10 @@
 package loadbalancer
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/OpenDgraph/Otter/internal/config"
+)
 
 type definedBalancer struct {
 	groups map[string]*RoundRobinBalancer
@@ -13,7 +17,8 @@ type PurposefulBalancer interface {
 
 var _ PurposefulBalancer = (*definedBalancer)(nil)
 
-func NewPurposefulBalancer(groups map[string][]string) PurposefulBalancer {
+func NewPurposefulBalancer(Config config.Config) PurposefulBalancer {
+	groups := Config.Groups
 	result := make(map[string]*RoundRobinBalancer)
 	for purpose, eps := range groups {
 		fmt.Printf("Purpose: %s, Endpoints: %v\n", purpose, eps)

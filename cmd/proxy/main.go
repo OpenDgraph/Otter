@@ -24,16 +24,16 @@ func main() {
 
 	switch cfg.BalancerType {
 	case "defined", "purposeful":
-		balancer := loadbalancer.NewPurposefulBalancer(cfg.Groups)
+		balancer := loadbalancer.NewPurposefulBalancer(*cfg)
 		fmt.Println("Using purposeful balancer")
-		proxyInstance, err = proxy.NewPurposefulProxy(balancer, cfg.DgraphUser, cfg.DgraphPassword)
+		proxyInstance, err = proxy.NewPurposefulProxy(balancer, *cfg)
 	default:
 		var balancer loadbalancer.Balancer
-		balancer, err = loadbalancer.NewBalancer(cfg.BalancerType, cfg.DgraphEndpoints)
+		balancer, err = loadbalancer.NewBalancer(*cfg)
 		if err != nil {
 			log.Fatalf("Error creating balancer: %v", err)
 		}
-		proxyInstance, err = proxy.NewProxy(balancer, cfg.DgraphEndpoints, cfg.DgraphUser, cfg.DgraphPassword)
+		proxyInstance, err = proxy.NewProxy(balancer, *cfg)
 	}
 
 	if err != nil {

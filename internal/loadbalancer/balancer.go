@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"sync"
+
+	"github.com/OpenDgraph/Otter/internal/config"
 )
 
 type Balancer interface {
@@ -36,7 +38,10 @@ func (b *RoundRobinBalancer) Next() string {
 	return endpoint
 }
 
-func NewBalancer(balancerType string, endpoints []string) (Balancer, error) {
+func NewBalancer(Config config.Config) (Balancer, error) {
+	endpoints := Config.DgraphEndpoints
+	balancerType := Config.BalancerType
+
 	switch balancerType {
 	case "round-robin":
 		log.Printf("| Running round-robin")

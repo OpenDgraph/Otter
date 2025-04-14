@@ -8,6 +8,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 
+	"github.com/OpenDgraph/Otter/internal/config"
 	"github.com/OpenDgraph/Otter/internal/dgraph"
 	"github.com/OpenDgraph/Otter/internal/helpers"
 	"github.com/OpenDgraph/Otter/internal/loadbalancer"
@@ -19,10 +20,13 @@ type Proxy struct {
 	clients    map[string]*dgraph.Client
 }
 
-func NewPurposefulProxy(balancer loadbalancer.PurposefulBalancer, user, password string) (*Proxy, error) {
+func NewPurposefulProxy(balancer loadbalancer.PurposefulBalancer, Config config.Config) (*Proxy, error) {
 	clients := map[string]*dgraph.Client{}
 
 	for _, ep := range balancer.AllEndpoints() {
+		user := Config.DgraphUser
+		password := Config.DgraphPassword
+
 		if _, ok := clients[ep]; ok {
 			continue
 		}
@@ -39,7 +43,11 @@ func NewPurposefulProxy(balancer loadbalancer.PurposefulBalancer, user, password
 	}, nil
 }
 
-func NewProxy(balancer loadbalancer.Balancer, endpoints []string, user, password string) (*Proxy, error) {
+func NewProxy(balancer loadbalancer.Balancer, Config config.Config) (*Proxy, error) {
+	user := Config.DgraphUser
+	password := Config.DgraphPassword
+	endpoints := Config.DgraphEndpoints
+
 	clients := make(map[string]*dgraph.Client)
 	for _, endpoint := range endpoints {
 		client, err := dgraph.NewClient(endpoint, user, password)
