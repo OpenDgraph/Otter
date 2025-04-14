@@ -28,3 +28,5 @@ __debug*
 build/
 
 .DS_Store
+
+**ast*.json
