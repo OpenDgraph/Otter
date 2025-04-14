@@ -45,7 +45,7 @@ func main() {
 	}
 
 	// Proxy HTTP server
-	if cfg.EnableHTTP {
+	if cfg.EnableHTTP != nil {
 		mux := http.NewServeMux()
 		mux.Handle("/", routing.SetupRoutes(proxyInstance))
 
@@ -59,7 +59,7 @@ func main() {
 	}
 
 	// WebSocket server
-	if cfg.EnableWebSocket {
+	if cfg.EnableWebSocket != nil {
 		wsMux := http.NewServeMux()
 		wsMux.HandleFunc("/ws", websocket.HandleWebSocketWithProxy(proxyInstance))
 		log.Printf("Starting websocket server on port %d\n", cfg.WebSocketPort)
@@ -68,7 +68,7 @@ func main() {
 		log.Println("WebSocket server disabled.")
 	}
 
-	if !cfg.EnableHTTP && !cfg.EnableWebSocket {
+	if cfg.EnableHTTP != nil && cfg.EnableWebSocket != nil {
 		log.Fatal("Both HTTP and WebSocket servers are disabled. Nothing to run.")
 	}
 

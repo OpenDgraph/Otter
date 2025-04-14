@@ -18,6 +18,7 @@ type Proxy struct {
 	balancer   loadbalancer.Balancer
 	Purposeful loadbalancer.PurposefulBalancer
 	clients    map[string]*dgraph.Client
+	configs    config.Config
 }
 
 func NewPurposefulProxy(balancer loadbalancer.PurposefulBalancer, Config config.Config) (*Proxy, error) {
@@ -40,6 +41,7 @@ func NewPurposefulProxy(balancer loadbalancer.PurposefulBalancer, Config config.
 	return &Proxy{
 		Purposeful: balancer,
 		clients:    clients,
+		configs:    Config,
 	}, nil
 }
 
@@ -60,6 +62,7 @@ func NewProxy(balancer loadbalancer.Balancer, Config config.Config) (*Proxy, err
 	return &Proxy{
 		balancer: balancer,
 		clients:  clients,
+		configs:  Config,
 	}, nil
 }
 
