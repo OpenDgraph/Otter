@@ -7,12 +7,23 @@ import (
 	dqlpkg "github.com/hypermodeinc/dgraph/v24/dql"
 )
 
-func RenderQuery(ast dqlpkg.Result, prefix string) string {
+// ! TODO: Remove AST from returning later
+func RenderQuery(query string, prefix string, returnAST bool) (string, *dqlpkg.Result) {
+	AST, err := ParseQuery(query)
+	if err != nil {
+		fmt.Printf("error")
+		return "", nil
+	}
+
 	var out strings.Builder
-	for _, q := range ast.Query {
+	for _, q := range AST.Query {
 		out.WriteString(renderBlock(q, "  ", prefix+"."))
 	}
-	return out.String()
+
+	if returnAST {
+		return out.String(), &AST
+	}
+	return out.String(), nil
 }
 
 func renderBlock(gq *dqlpkg.GraphQuery, indent string, prefix string) string {

@@ -1,4 +1,4 @@
-package parsing
+package ast
 
 import (
 	"github.com/alecthomas/participle/v2"

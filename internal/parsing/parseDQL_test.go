@@ -13,12 +13,9 @@ func TestParse(t *testing.T) {
 	  }
 	}
 	`
-	AST, err := ParseQuery(query)
-	if err != nil {
-		t.Errorf("Parse(%v) = %v; want nil", AST, err)
-	}
-	newquery := RenderQuery(AST, "user")
-	SaveDQLSnapshotFile("basic query", query, AST, "snapshots/dql_ast.json", newquery)
+	parsedQuery, ast := RenderQuery(query, "user", true)
+
+	err := SaveDQLSnapshotFile("basic query", query, *ast, "snapshots/dql_ast.json", parsedQuery)
 	if err != nil {
 		log.Fatalf("Erro Saving the snapshot: %v", err)
 	}
