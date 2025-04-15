@@ -46,3 +46,35 @@ stopd:
 
 build-docker:
 	docker build -t otter-local -f examples/cluster/Dockerfile .
+
+check-updates:
+	@echo "Checking for available updates..."
+	go list -u -m -json all | grep '"Path"\|"Version"\|"Update"'
+ 
+upgrade-all:
+	@echo "Upgrading all dependencies..."
+	go get -u ./...
+	go mod tidy
+	@echo "All dependencies upgraded."
+ 
+upgrade:
+ifndef MODULE
+	$(error You must provide a module name with MODULE=example.com/lib)
+endif
+	@echo "Upgrading $(MODULE)..."
+	go get -u $(MODULE)
+	go mod tidy
+	@echo "$(MODULE) upgraded."
+
+# Clean up unused dependencies
+tidy:
+	@echo "Tidying up unused dependencies..."
+	go mod tidy
+	@echo "go.mod and go.sum are clean."
+
+# Display dependency graph
+deps:
+	@echo "Displaying dependency graph..."
+	go mod graph
+
+.PHONY: check-updates upgrade-all upgrade tidy deps
