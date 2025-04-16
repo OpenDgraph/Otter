@@ -2,7 +2,13 @@
 
 > Under construction 🚧
 
-Otter is a lightweight proxy designed to intelligently balance traffic to [Dgraph](https://dgraph.io). It currently supports round-robin or purpose-based balancing between groups of endpoints.
+> Built for performance. Designed for graphs.
+
+Otter is a lightweight, purpose-driven proxy and query transpiler for [Dgraph](https://dgraph.io).  
+It intelligently balances traffic between Dgraph clusters and adds support for advanced query workflows — including Cypher-to-DQL translation (in progress).
+
+
+Otter aims to serve as the foundation for future support of multiple graph languages, offering modular extensions, semantic enrichment, and introspection tools.
 
 # Why this Software?
 
