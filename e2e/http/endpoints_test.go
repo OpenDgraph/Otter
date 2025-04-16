@@ -109,25 +109,34 @@ func TestHTTPAPI(t *testing.T) {
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 				t.Errorf("Query response status was %d but failed to unmarshal JSON body: %v. Body: %s", resp.StatusCode, err, string(bodyBytes))
 			}
-
-		} else {
-
-			dataSlice, ok := queryResult["data"].([]interface{})
-			if !ok {
-				t.Errorf("Query response JSON does not contain a 'data' array. Body: %s", string(bodyBytes))
-			} else if len(dataSlice) == 0 {
-				t.Errorf("Query for 'Alice via HTTP' returned no results. Body: %s", string(bodyBytes))
-			} else {
-
-				firstResult, ok := dataSlice[0].(map[string]interface{})
-				if ok {
-					if name, ok := firstResult["name"].(string); !ok || name != "Alice via HTTP" {
-						t.Errorf("First result name mismatch. Expected 'Alice via HTTP', got '%v'", firstResult["name"])
-					}
-					t.Logf("Successfully found node for 'Alice via HTTP' with UID: %v", firstResult["uid"])
-				}
-			}
+			return
 		}
+
+		innerData, ok := queryResult["data"].(map[string]interface{})
+		if !ok {
+			t.Errorf("Query response JSON 'data' field is not a map. Body: %s", string(bodyBytes))
+			return
+		}
+
+		dataSlice, ok := innerData["data"].([]interface{})
+		if !ok {
+			t.Errorf("Query response JSON does not contain a 'data' array. Body: %s", string(bodyBytes))
+			return
+		}
+
+		if len(dataSlice) == 0 {
+			t.Errorf("Query for 'Alice via HTTP' returned no results. Body: %s", string(bodyBytes))
+			return
+		}
+
+		firstResult, ok := dataSlice[0].(map[string]interface{})
+		if ok {
+			if name, ok := firstResult["name"].(string); !ok || name != "Alice via HTTP" {
+				t.Errorf("First result name mismatch. Expected 'Alice via HTTP', got '%v'", firstResult["name"])
+			}
+			t.Logf("Successfully found node for 'Alice via HTTP' with UID: %v", firstResult["uid"])
+		}
+
 	})
 
 }

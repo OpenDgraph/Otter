@@ -5,41 +5,42 @@ import (
 	"log"
 
 	"github.com/OpenDgraph/Otter/internal/dgraph"
+	"github.com/OpenDgraph/Otter/internal/loadbalancer"
 )
 
-func (p *Proxy) SelectClientAuto(purpose string) (string, *dgraph.Client, error) {
+func (p *Proxy) SelectClientAuto(purpose string) (loadbalancer.EndpointInfo, *dgraph.Client, error) {
 	if p.Purposeful != nil {
 		return p.SelectClientByPurpose(purpose)
 	}
 	return p.SelectClient()
 }
 
-func (p *Proxy) SelectClient() (string, *dgraph.Client, error) {
-	endpoint := p.balancer.Next()
-	if endpoint == "" {
-		return "", nil, fmt.Errorf("| No Dgraph endpoints available")
+func (p *Proxy) SelectClient() (loadbalancer.EndpointInfo, *dgraph.Client, error) {
+	endpointInfo := p.balancer.Next()
+	if endpointInfo.Endpoint == "" {
+		return loadbalancer.EndpointInfo{}, nil, fmt.Errorf("| No Dgraph endpoints available")
 	}
-	client, ok := p.clients[endpoint]
+	client, ok := p.clients[endpointInfo.Endpoint]
 	if !ok {
-		return "", nil, fmt.Errorf("| Dgraph client not found for endpoint %s", endpoint)
+		return loadbalancer.EndpointInfo{}, nil, fmt.Errorf("| Dgraph client not found for endpoint %s", endpointInfo.Endpoint)
 	}
-	log.Printf("| Selected Dgraph endpoint: %s", endpoint)
-	return endpoint, client, nil
+	log.Printf("| Selected Dgraph endpoint: %s", endpointInfo.Endpoint)
+	return endpointInfo, client, nil
 }
 
-func (p *Proxy) SelectClientByPurpose(purpose string) (string, *dgraph.Client, error) {
+func (p *Proxy) SelectClientByPurpose(purpose string) (loadbalancer.EndpointInfo, *dgraph.Client, error) {
 	if p.Purposeful == nil {
-		return "", nil, fmt.Errorf("purposeful balancer not initialized")
+		return loadbalancer.EndpointInfo{}, nil, fmt.Errorf("purposeful balancer not initialized")
 	}
 
-	endpoint, err := p.Purposeful.Next(purpose)
+	endpointInfo, err := p.Purposeful.Next(purpose)
 	if err != nil {
-		return "", nil, err
+		return loadbalancer.EndpointInfo{}, nil, err
 	}
-	client, ok := p.clients[endpoint]
+	client, ok := p.clients[endpointInfo.Endpoint]
 	if !ok {
-		return "", nil, fmt.Errorf("| Dgraph client not found for endpoint %s", endpoint)
+		return loadbalancer.EndpointInfo{}, nil, fmt.Errorf("| Dgraph client not found for endpoint %s", endpointInfo.Endpoint)
 	}
-	log.Printf("| ByPurpose | Selected Dgraph endpoint: %s", endpoint)
-	return endpoint, client, nil
+	log.Printf("| ByPurpose | Selected Dgraph endpoint: %s", endpointInfo.Endpoint)
+	return endpointInfo, client, nil
 }

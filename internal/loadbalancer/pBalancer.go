@@ -11,7 +11,7 @@ type definedBalancer struct {
 }
 
 type PurposefulBalancer interface {
-	Next(purpose string) (string, error)
+	Next(purpose string) (EndpointInfo, error)
 	AllEndpoints() []string
 }
 
@@ -27,10 +27,13 @@ func NewPurposefulBalancer(Config config.Config) PurposefulBalancer {
 	return &definedBalancer{groups: result}
 }
 
-func (b *definedBalancer) Next(purpose string) (string, error) {
+func (b *definedBalancer) Next(purpose string) (EndpointInfo, error) {
 	group, ok := b.groups[purpose]
 	if !ok {
-		return "", fmt.Errorf("no endpoints defined for purpose: %s", purpose)
+		return EndpointInfo{}, fmt.Errorf("no endpoints defined for purpose: %s", purpose)
+	}
+	if len(group.nodes) == 0 {
+		return EndpointInfo{}, fmt.Errorf("no valid endpoints available for purpose: %s", purpose)
 	}
 	return group.Next(), nil
 }
@@ -38,11 +41,12 @@ func (b *definedBalancer) Next(purpose string) (string, error) {
 func (b *definedBalancer) AllEndpoints() []string {
 	seen := make(map[string]struct{})
 	var all []string
+
 	for _, group := range b.groups {
-		for _, ep := range group.endpoints {
-			if _, exists := seen[ep]; !exists {
-				all = append(all, ep)
-				seen[ep] = struct{}{}
+		for _, node := range group.nodes {
+			if _, exists := seen[node.Endpoint]; !exists {
+				all = append(all, node.Endpoint)
+				seen[node.Endpoint] = struct{}{}
 			}
 		}
 	}
