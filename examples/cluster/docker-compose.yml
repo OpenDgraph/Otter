@@ -90,6 +90,11 @@ services:
       --security whitelist=0.0.0.0/0
       -o 3
 
+  dgraph-ratel:
+   image: dgraph/ratel:latest
+   restart: always
+   ports:
+     - 8000
 
 volumes:
   dgraph-zero-otter:

@@ -21,6 +21,7 @@ type Config struct {
 	EnableHTTP      *bool               `yaml:"enable_http"`
 	GraphQL         *bool               `yaml:"graphql"`
 	EnableWebSocket *bool               `yaml:"enable_websocket"`
+	Ratel           string              `yaml:"ratel"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -38,6 +39,17 @@ func LoadConfig() (*Config, error) {
 		log.Printf("Successfully loaded config from %s", filePath)
 	} else {
 		log.Printf("CONFIG_FILE environment variable not set. Proceeding without YAML file.")
+	}
+
+	if cfg.Ratel == "" {
+		if val := os.Getenv("RATEL"); val != "" {
+			cfg.Ratel = val
+			log.Printf("RATEL set from environment.")
+		} else {
+			log.Printf("RATEL not set in env or YAML.")
+		}
+	} else {
+		log.Printf("RATEL already defined in YAML (%q). Ignoring environment variable.", cfg.Ratel)
 	}
 
 	if cfg.EnableHTTP == nil {

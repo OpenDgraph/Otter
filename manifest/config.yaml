@@ -6,6 +6,7 @@ dgraph_password: ""
 enable_http: true
 enable_websocket: true
 graphql: true
+ratel: localhost:8000
 dgraph_endpoints: # Needed if using simple round-robin balancing
   - localhost:9080
   - localhost:9088
