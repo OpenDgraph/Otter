@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	ContentTypeJSON = "application/json"
-	ContentTypeDQL  = "application/dql"
+	ContentTypeJSON   = "application/json"
+	ContentTypeDQL    = "application/dql"
+	ContentTypeOldDQL = "application/graphql+-"
 )
 
 func ReadRequestBody(r *http.Request) ([]byte, error) {
@@ -38,6 +39,8 @@ func CheckQueryBody(contentType string, body []byte) (string, error) {
 		}
 		return query, nil
 
+	case ContentTypeOldDQL:
+		fallthrough
 	case ContentTypeDQL:
 		if len(body) == 0 {
 			return "", fmt.Errorf("| Empty request body for %s", ContentTypeDQL)
@@ -92,8 +95,36 @@ func WriteJSONError(w http.ResponseWriter, status int, msg string) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
-func WriteJSONResponse(w http.ResponseWriter, status int, data []byte) {
+func WriteJSONResponse(w http.ResponseWriter, status int, resp *api.Response) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_, _ = w.Write(data)
+
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(resp.Json, &parsed); err != nil {
+		WriteJSONError(w, http.StatusInternalServerError, "error parsing response")
+		return
+	}
+
+	// Constrói resposta final com extensions
+	response := map[string]interface{}{
+		"data": parsed,
+		"extensions": map[string]interface{}{
+			"server_latency": map[string]interface{}{
+				"parsing_ns":          resp.Latency.GetParsingNs(),
+				"processing_ns":       resp.Latency.GetProcessingNs(),
+				"encoding_ns":         resp.Latency.GetEncodingNs(),
+				"assign_timestamp_ns": resp.Latency.GetAssignTimestampNs(),
+				"total_ns":            resp.Latency.GetTotalNs(),
+			},
+			"txn": map[string]interface{}{
+				"start_ts": resp.Txn.GetStartTs(),
+			},
+			"metrics": map[string]interface{}{
+				"num_uids": resp.Metrics.GetNumUids(),
+			},
+		},
+	}
+
+	finalJSON, _ := json.Marshal(response)
+	_, _ = w.Write(finalJSON)
 }
