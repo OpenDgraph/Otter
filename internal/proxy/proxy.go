@@ -259,7 +259,7 @@ func (p *Proxy) HandleFrontend(w http.ResponseWriter, r *http.Request) {
 
 	targetURL := &url.URL{
 		Scheme: "http",
-		Host:   "192.168.175.33:8000", //TMP
+		Host:   p.configs.Ratel,
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(targetURL)
