@@ -30,6 +30,7 @@ Current design.
 -  WebSocket server with support for `query`, `mutation`, and `upsert`
 -  Simple token-based authentication
 -  Configurable via environment variables or YAML
+-  Otter now supports GraphQL queries via Ratel. Just enable the experimental feature `ratel-graphql: true`
 
 ---
 
