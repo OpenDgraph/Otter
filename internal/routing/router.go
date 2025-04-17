@@ -16,6 +16,8 @@ func SetupRoutes(p *proxy.Proxy) *http.ServeMux {
 	mux.HandleFunc("/validate/schema", api.ValidateSchemaHandler)
 	mux.HandleFunc("/health", p.HandleDirect)
 	mux.HandleFunc("/ui/keywords", p.HandleDirect)
+	mux.HandleFunc("/admin/schema", p.HandleDirect)
+	mux.HandleFunc("/state", p.HandleDirect)
 	mux.HandleFunc("/", p.HandleFrontend)
 	return mux
 }

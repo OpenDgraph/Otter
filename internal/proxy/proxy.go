@@ -88,12 +88,13 @@ func (p *Proxy) HandleGraphQL(w http.ResponseWriter, r *http.Request) {
 	originalDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
 		originalDirector(req)
-		req.URL.Path = "/query"
+		req.URL.Path = "/graphql"
 	}
 
-	log.Printf("Proxying GraphQL request to %s/query", backendHost)
+	log.Printf("Proxying GraphQL request to %s/graphql", backendHost)
 	proxy.ServeHTTP(w, r)
 }
+
 func (p *Proxy) HandleQuery(w http.ResponseWriter, r *http.Request) {
 	body, err := helpers.ReadRequestBody(r)
 	if err != nil {
@@ -196,8 +197,10 @@ func (p *Proxy) selectBackendHost(purpose, protocol string) (string, error) {
 }
 
 var allowedPaths = map[string]bool{
-	"/health":      true,
-	"/ui/keywords": true,
+	"/health":       true,
+	"/ui/keywords":  true,
+	"/admin/schema": true,
+	"/state":        true,
 }
 
 func (p *Proxy) HandleDirect(w http.ResponseWriter, r *http.Request) {
