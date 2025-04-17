@@ -8,7 +8,7 @@ import (
 	"github.com/OpenDgraph/Otter/internal/helpers"
 )
 
-func (p *Proxy) runDQLQuery(query string, w http.ResponseWriter, r *http.Request) {
+func (p *Proxy) runDQLQuery(query string, w http.ResponseWriter) {
 
 	_, client, err := p.SelectClientAuto("query")
 	if err != nil {

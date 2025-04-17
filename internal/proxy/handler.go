@@ -28,7 +28,7 @@ func (p *Proxy) HandleQuery(w http.ResponseWriter, r *http.Request) {
 	if p.graphQLAllowed() && !isDQL(query) {
 		p.forwardGraphQL(body, w, r)
 	} else {
-		p.runDQLQuery(query, w, r)
+		p.runDQLQuery(query, w)
 	}
 }
 
