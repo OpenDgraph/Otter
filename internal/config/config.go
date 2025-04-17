@@ -22,6 +22,7 @@ type Config struct {
 	GraphQL         *bool               `yaml:"graphql"`
 	EnableWebSocket *bool               `yaml:"enable_websocket"`
 	Ratel           string              `yaml:"ratel"`
+	RatelGraphQL    *bool               `yaml:"ratel_graphql"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -50,6 +51,25 @@ func LoadConfig() (*Config, error) {
 		}
 	} else {
 		log.Printf("RATEL already defined in YAML (%q). Ignoring environment variable.", cfg.Ratel)
+	}
+
+	if cfg.RatelGraphQL == nil {
+		if val := os.Getenv("RATEL_GRAPHQL"); val != "" {
+			parsedVal, err := strconv.ParseBool(val)
+			if err != nil {
+				cfg.RatelGraphQL = ptrBool(strings.ToLower(val) != "false")
+				log.Printf("Warning: Invalid boolean value for RATEL_GRAPHQL env var: %q. Using simple check.", val)
+			} else {
+				cfg.RatelGraphQL = &parsedVal
+			}
+			log.Printf("RatelGraphQL set from environment: %v", *cfg.RatelGraphQL)
+		} else {
+			defaultVal := true
+			cfg.RatelGraphQL = &defaultVal
+			log.Printf("")
+		}
+	} else {
+		log.Printf("RatelGraphQL already defined in YAML (%v). Ignoring environment variable.", *cfg.RatelGraphQL)
 	}
 
 	if cfg.EnableHTTP == nil {

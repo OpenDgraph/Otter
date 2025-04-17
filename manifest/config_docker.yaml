@@ -6,6 +6,7 @@ dgraph_password: ""
 enable_http: true
 enable_websocket: true
 graphql: true
+ratel-graphql: true
 ratel: dgraph-ratel:8000
 dgraph_endpoints: # Needed if using simple round-robin balancing
   - dgraph-alpha1:9081
