@@ -8,24 +8,15 @@ import (
 	"github.com/OpenDgraph/Otter/internal/loadbalancer"
 )
 
-func (p *Proxy) SelectClientAuto(purpose string) (loadbalancer.EndpointInfo, *dgraph.Client, error) {
-	if p.Purposeful != nil {
-		return p.SelectClientByPurpose(purpose)
-	}
-	return p.SelectClient()
+var allowedPaths = map[string]bool{
+	"/health":       true,
+	"/ui/keywords":  true,
+	"/admin/schema": true,
+	"/state":        true,
 }
 
-func (p *Proxy) SelectClient() (loadbalancer.EndpointInfo, *dgraph.Client, error) {
-	endpointInfo := p.balancer.Next()
-	if endpointInfo.Endpoint == "" {
-		return loadbalancer.EndpointInfo{}, nil, fmt.Errorf("| No Dgraph endpoints available")
-	}
-	client, ok := p.clients[endpointInfo.Endpoint]
-	if !ok {
-		return loadbalancer.EndpointInfo{}, nil, fmt.Errorf("| Dgraph client not found for endpoint %s", endpointInfo.Endpoint)
-	}
-	log.Printf("| Selected Dgraph endpoint: %s", endpointInfo.Endpoint)
-	return endpointInfo, client, nil
+func (p *Proxy) graphQLAllowed() bool {
+	return p.configs.GraphQL != nil && *p.configs.GraphQL
 }
 
 func (p *Proxy) SelectClientByPurpose(purpose string) (loadbalancer.EndpointInfo, *dgraph.Client, error) {
