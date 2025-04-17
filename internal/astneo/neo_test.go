@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/OpenDgraph/Otter/internal/helpers"
 	"github.com/alecthomas/participle/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +16,7 @@ func TestMatchReturn(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	saveASTSnapshot(t, ASTSnapshot{
+	helpers.SaveASTSnapshot(t, helpers.ASTSnapshot{
 		Test:  t.Name(),
 		Input: src,
 		AST:   ast,
@@ -42,7 +43,7 @@ func TestMatchRelation(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	saveASTSnapshot(t, ASTSnapshot{
+	helpers.SaveASTSnapshot(t, helpers.ASTSnapshot{
 		Test:  t.Name(),
 		Input: src,
 		AST:   ast,
@@ -81,7 +82,7 @@ func TestMatchWhereReturn(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	saveASTSnapshot(t, ASTSnapshot{
+	helpers.SaveASTSnapshot(t, helpers.ASTSnapshot{
 		Test:  t.Name(),
 		Input: src,
 		AST:   ast,
@@ -115,7 +116,7 @@ func TestMatchNodeWithoutLabel(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	saveASTSnapshot(t, ASTSnapshot{
+	helpers.SaveASTSnapshot(t, helpers.ASTSnapshot{
 		Test:  t.Name(),
 		Input: src,
 		AST:   ast,
@@ -141,7 +142,7 @@ func TestMatchMultipleReturnFields(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	saveASTSnapshot(t, ASTSnapshot{
+	helpers.SaveASTSnapshot(t, helpers.ASTSnapshot{
 		Test:  t.Name(),
 		Input: src,
 		AST:   ast,
@@ -178,7 +179,7 @@ func TestMatchLongerPath(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	saveASTSnapshot(t, ASTSnapshot{
+	helpers.SaveASTSnapshot(t, helpers.ASTSnapshot{
 		Test:  t.Name(),
 		Input: src,
 		AST:   ast,
@@ -225,7 +226,7 @@ func TestMatchWhereDifferentOperator(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	saveASTSnapshot(t, ASTSnapshot{
+	helpers.SaveASTSnapshot(t, helpers.ASTSnapshot{
 		Test:  t.Name(),
 		Input: src,
 		AST:   ast,
@@ -259,7 +260,7 @@ func TestMatchLongPathWithWhereAndMultipleReturn(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	saveASTSnapshot(t, ASTSnapshot{
+	helpers.SaveASTSnapshot(t, helpers.ASTSnapshot{
 		Test:  t.Name(),
 		Input: src,
 		AST:   ast,
@@ -436,7 +437,7 @@ func TestRelationWithAlias(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	saveASTSnapshot(t, ASTSnapshot{
+	helpers.SaveASTSnapshot(t, helpers.ASTSnapshot{
 		Test:  t.Name(),
 		Input: src,
 		AST:   ast,

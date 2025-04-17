@@ -3,6 +3,7 @@ package astneo
 import (
 	"testing"
 
+	"github.com/OpenDgraph/Otter/internal/helpers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,7 +13,7 @@ func TestCreateSingleNode(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	saveASTSnapshot(t, ASTSnapshot{
+	helpers.SaveASTSnapshot(t, helpers.ASTSnapshot{
 		Test:  t.Name(),
 		Input: src,
 		AST:   ast,
@@ -53,7 +54,7 @@ func TestMatchAndCreate(t *testing.T) {
 	ast, err := parser.ParseString("", src)
 	require.NoError(t, err)
 
-	saveASTSnapshot(t, ASTSnapshot{
+	helpers.SaveASTSnapshot(t, helpers.ASTSnapshot{
 		Test:  t.Name(),
 		Input: src,
 		AST:   ast,

@@ -1,4 +1,4 @@
-package astneo
+package helpers
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ type ASTSnapshot struct {
 	AST   interface{} `json:"ast"`
 }
 
-func saveASTSnapshot(t *testing.T, snapshot ASTSnapshot, path string) {
+func SaveASTSnapshot(t *testing.T, snapshot ASTSnapshot, path string) {
 	t.Helper()
 
 	dir := filepath.Dir(path)
