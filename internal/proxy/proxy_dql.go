@@ -18,9 +18,9 @@ func (p *Proxy) runDQLQuery(query string, w http.ResponseWriter) {
 
 	resp, err := client.Query(context.Background(), query)
 	if err != nil {
-		helpers.WriteJSONError(w, http.StatusInternalServerError,
-			fmt.Sprintf("Error querying Dgraph: %v", err))
+		helpers.WriteJSONQueryError(w, fmt.Sprintf("Error querying Dgraph: %v", err))
 		return
 	}
+
 	helpers.WriteJSONResponse(w, http.StatusOK, resp)
 }

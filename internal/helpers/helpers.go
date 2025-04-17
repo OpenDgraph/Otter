@@ -95,6 +95,29 @@ func WriteJSONError(w http.ResponseWriter, status int, msg string) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
+func WriteJSONQueryError(w http.ResponseWriter, msg string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
+	response := map[string]interface{}{
+		"data": map[string]interface{}{},
+		"errors": []map[string]interface{}{
+			{
+				"message": msg,
+			},
+		},
+		"extensions": map[string]interface{}{
+			"server_latency": map[string]interface{}{},
+			"txn":            map[string]interface{}{},
+			"metrics": map[string]interface{}{
+				"num_uids": map[string]interface{}{},
+			},
+		},
+	}
+
+	_ = json.NewEncoder(w).Encode(response)
+}
+
 func WriteJSONResponse(w http.ResponseWriter, status int, resp *api.Response) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
