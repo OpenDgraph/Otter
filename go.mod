@@ -8,6 +8,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hypermodeinc/dgraph/v24 v24.1.2
 	github.com/stretchr/testify v1.10.0
+	github.com/vektah/gqlparser/v2 v2.5.16
 	google.golang.org/grpc v1.71.1
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -19,6 +20,7 @@ require (
 	github.com/DataDog/opencensus-go-exporter-datadog v0.0.0-20220622145613-731d59e8b567 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
+	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.22.0 // indirect
 	github.com/blevesearch/bleve/v2 v2.5.0 // indirect

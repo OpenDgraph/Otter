@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"sync"
 
 	"github.com/OpenDgraph/Otter/internal/helpers"
+	api "github.com/dgraph-io/dgo/v240/protos/api"
 )
 
 func (p *Proxy) HandleQuery(w http.ResponseWriter, r *http.Request) {
@@ -40,15 +42,51 @@ func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	contentType := r.Header.Get("Content-Type")
-	mutation, err := helpers.CheckMutationBody(contentType, body)
+	mutation, upserts, err := helpers.CheckMutationBody(contentType, body)
 	if err != nil {
-		helpers.WriteJSONError(w, http.StatusUnsupportedMediaType, err.Error())
+		helpers.WriteJSONQueryError(w, fmt.Sprintf("Error querying Dgraph: %v", err.Error()))
 		return
 	}
 
 	_, client, err := p.SelectClientAuto("mutation")
 	if err != nil {
 		helpers.WriteJSONError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+
+	if upserts != nil {
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		var responses []*api.Response
+		var errs []string
+
+		for _, up := range upserts {
+			wg.Add(1)
+			go func(up *helpers.UpsertBlock) {
+				defer wg.Done()
+				mut := &api.Mutation{
+					SetNquads: []byte(up.Mutation),
+					Cond:      up.Cond,
+				}
+				resp, err := client.Upsert(context.Background(), up.Query, []*api.Mutation{mut}, true)
+				mu.Lock()
+				defer mu.Unlock()
+				if err != nil {
+					errs = append(errs, err.Error())
+				} else {
+					responses = append(responses, resp)
+				}
+			}(up)
+		}
+
+		wg.Wait()
+
+		if len(errs) > 0 {
+			helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Sprintf("Some upserts failed: %v", errs))
+			return
+		}
+
+		helpers.WriteJSONResponse(w, http.StatusOK, responses[0])
 		return
 	}
 
