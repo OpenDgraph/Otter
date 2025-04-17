@@ -1,0 +1,20 @@
+ 
+type TodoList {
+  id: ID!
+  title: String! @search(by: [term])
+  todos: [TodoItem] @hasInverse(field: list)
+
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type TodoItem {
+  id: ID!
+  text: String! @search(by: [term])
+  done: Boolean! 
+  dueDate: DateTime
+  list: TodoList!
+
+  createdAt: DateTime
+  updatedAt: DateTime
+}

@@ -11,7 +11,8 @@
                 "DGRAPH_ENDPOINTS": "localhost:9080,localhost:9088,localhost:9096",
                 "PROXY_PORT": "8084",
                 "WEBSOCKET_PORT": "8089",
-                "RATEL": "192.168.175.33:8000"
+                "RATEL": "192.168.175.33:8000",
+                "RATEL_GRAPHQL": "True"
             }
         },
         {
