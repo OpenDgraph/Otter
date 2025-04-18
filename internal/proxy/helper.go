@@ -13,6 +13,7 @@ var allowedPaths = map[string]bool{
 	"/ui/keywords":  true,
 	"/admin/schema": true,
 	"/state":        true,
+	"/alter":        true,
 }
 
 func (p *Proxy) graphQLAllowed() bool {

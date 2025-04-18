@@ -14,6 +14,7 @@ func SetupRoutes(p *proxy.Proxy) *http.ServeMux {
 	mux.HandleFunc("/graphql", p.HandleGraphQL)
 	mux.HandleFunc("/validate/dql", api.ValidateDQLHandler)
 	mux.HandleFunc("/validate/schema", api.ValidateSchemaHandler)
+	mux.HandleFunc("/alter", p.HandleDirect)
 	mux.HandleFunc("/health", p.HandleDirect)
 	mux.HandleFunc("/ui/keywords", p.HandleDirect)
 	mux.HandleFunc("/admin/schema", p.HandleDirect)
