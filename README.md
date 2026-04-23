@@ -4,49 +4,68 @@
 
 > Built for performance. Designed for graphs.
 
-Otter is a lightweight, purpose-driven proxy and query transpiler for [Dgraph](https://dgraph.io).  
-It intelligently balances traffic between Dgraph clusters and adds support for advanced query workflows — including Cypher-to-DQL translation (in progress).
+Otter is a lightweight, purpose-driven proxy and gateway for
+[Dgraph](https://dgraph.io). It balances traffic across Dgraph alphas
+per request purpose (`query` / `mutation` / `upsert`), proxies the HTTP
+admin surface, and exposes a WebSocket gateway that speaks the same
+shapes as the HTTP endpoints.
 
+Longer-term, Otter is intended to become the foundation for multiple
+graph languages, semantic enrichment, and introspection tooling.
+Those pieces are **research directions**, not committed work &mdash;
+see the "Later / research" horizon in the roadmap below and the
+notes in `why.md` and `internal/loadbalancer/idea.md`.
 
-Otter aims to serve as the foundation for future support of multiple graph languages, offering modular extensions, semantic enrichment, and introspection tools.
+## Why this software?
 
-# Why this Software?
-
-Read [Why](why.md) this software was created.
+Read [why.md](why.md) for the long version. The short version: Dgraph
+is very capable but does not ship an opinionated gateway that spreads
+load per request purpose, and the author wanted one.
 
 ---
 
 
-# Otter Design
+## Design
 
-Current design.
+Current design overview:
 
 ![Otter Design](assets/design.png)
 
-### Features
+## Features
 
--  Round-robin and purposeful load balancing across Dgraph alphas
--  HTTP proxy for Dgraph `/query`, `/mutate`, `/alter`, `/health`, `/state`,
-   `/admin/schema`, `/ui/keywords`
--  WebSocket server with support for `auth`, `ping`, `query`, `mutation`, `upsert`
--  GraphQL pass-through to Dgraph's `/graphql` endpoint when enabled
--  Configurable via YAML and environment variables
+- Round-robin and purposeful load balancing across Dgraph alphas
+- HTTP proxy for Dgraph `/query`, `/mutate`, `/alter`, `/graphql`,
+  `/health`, `/state`, `/admin/schema`, `/ui/keywords`
+- WebSocket gateway with `auth`, `ping`, `query`, `mutation`, `upsert`
+- Static `/validate/dql` and `/validate/schema` endpoints (no round-trip)
+- Configurable via YAML and environment variables, with dev-vs-production
+  safety defaults
 
-### Current Status
+## Current Status
 
-- Working today: the items listed above, against a local Dgraph cluster.
-- Experimental / dev-only: WebSocket auth is a single hardcoded token
-  (`"banana"`) and accepts every `Origin`. See `docs/repo_audit.md` for
-  details and `docs/phase1_backlog.md` for the planned hardening.
-- Not implemented yet despite appearing in the roadmap: health-aware
-  balancing, leader-aware routing, Cypher transpilation, and the framework
-  features from `why.md` and `internal/loadbalancer/idea.md`. Those remain
-  research directions.
-- Dgraph version posture: the Go module depends on `hypermodeinc/dgraph/v24`
-  for GraphQL schema handling, while `examples/cluster/docker-compose.yml`
-  pins `dgraph/dgraph:v25.0.0-preview1`. gRPC traffic is compatible in
-  practice but schema behaviour is not guaranteed across majors; smoke-test
-  before relying on it.
+- **Working today:** round-robin and purposeful balancing, HTTP proxy for
+  `/query`, `/mutate`, `/alter`, `/health`, `/state`, `/admin/schema`,
+  `/graphql`, a WebSocket gateway, and YAML + environment configuration.
+- **Dev-mode safety defaults:** when `dev_mode: true` (the shipped
+  default), the WebSocket handler auto-generates an ephemeral auth token
+  at startup and accepts any `Origin`; both are logged as warnings. Set
+  `dev_mode: false` with explicit `ws_token` and `ws_allowed_origins` for
+  fail-closed behaviour. See `docs/security.md`.
+- **Experimental / under audit:** the `purposeful` balancer, the GraphQL
+  pass-through, the body-size cap (1 MiB default), and the HTTP server
+  timeouts all ship with conservative defaults that have been smoke-tested
+  end-to-end but not stress-tested.
+- **Not implemented despite appearing in notes:** health-aware balancing,
+  leader-aware routing, Cypher transpilation, and the framework /
+  ontology features from `why.md` and `internal/loadbalancer/idea.md`
+  are research directions, not committed work. They are kept in the repo
+  because they shape the long-term design.
+- **Dgraph version posture:** the Go module depends on
+  `hypermodeinc/dgraph/v24` for GraphQL schema handling, while
+  `examples/cluster/docker-compose.yml` pins
+  `dgraph/dgraph:v25.0.0-preview1`. gRPC traffic is compatible in
+  practice but schema behaviour across majors is not guaranteed;
+  smoke-test before relying on it.
 
 ---
 
@@ -64,19 +83,30 @@ Full step-by-step commands live in `docs/runbook.md`. Short version:
 `go test ./...` only runs unit tests; the E2E suite is gated by the
 `e2e` build tag so a clean checkout stays green without Docker.
 
-## Run Otter with Docker
+## Testing Strategy
 
-Requirements
+Otter intentionally splits tests into two tiers so contributors can move fast
+without Docker, while keeping a deterministic end-to-end path for CI:
 
-* Clone the repository
+| Tier                  | Command              | Docker | Build tag | What it covers                                              |
+|-----------------------|----------------------|--------|-----------|-------------------------------------------------------------|
+| Unit / internal       | `make test-unit`     | no     | none      | handlers, config, balancers, helpers, parsers, websocket    |
+| Default `go test`     | `go test ./...`      | no     | none      | same as unit; E2E packages compile but have no tests exposed |
+| Docker-backed E2E     | `make test-e2e`      | yes    | `e2e`     | live HTTP + WS round-trips against a real Dgraph cluster    |
+| One-shot E2E          | `make e2e`           | yes    | `e2e`     | up, wait for readiness, seed, run E2E, tear down            |
 
-* Docker
+The `e2e` build tag is the single source of truth. A test that needs a
+running Otter on `localhost:8084` / `localhost:8089` must carry the
+`//go:build e2e` header so default runs stay hermetic.
 
-* Docker Compose
+Full details, ports, and env vars live in `docs/runbook.md`.
 
-* (optional) make installed
+## Quick Start
 
-#### Run with make
+### With Docker (recommended)
+
+Requirements: Docker + Docker Compose (OrbStack works). `make` is
+optional but assumed by the commands below.
 
 ```bash
 make rund          # foreground, logs streamed
@@ -84,89 +114,98 @@ make rund          # foreground, logs streamed
 make e2e-up        # background; pair with make e2e-wait
 ```
 
- Manual Docker Compose
-If you don't have make:
+If you don't have `make`:
 
 ```bash
 cd examples/cluster
 docker compose up --build
 ```
 
-#### Configuration
-By default, Otter will load config from:
-
-```ini
-CONFIG_FILE=/app/manifest/config_docker.yaml
-```
-
-If you want to change the config:
-
-```
-manifest/config_docker.yaml
-```
-
-Or override with environment variables (see internal/config/config.go for supported vars)
-
----
-
-### Example WebSocket Payload
-
-```json
-{
-  "type": "upsert",
-  "query": "query { u as var(func: eq(email, \"test@example.com\")) }",
-  "mutation": "uid(u) <name> \"Test\" .",
-  "cond": "@if(eq(len(u), 1))",
-  "commitNow": true
-}
-```
-
----
-
-### Run Locally
+### Locally (against an existing Dgraph)
 
 ```bash
 git clone https://github.com/OpenDgraph/Otter.git
 cd Otter
-```
-
-```bash
 export CONFIG_FILE=./manifest/config.yaml
-go run cmd/proxy/main.go
+go run ./cmd/proxy
 ```
 
-Set your balancer strategy inside `config.yaml`:
+`manifest/config.yaml` points at `localhost:9080` / `localhost:9088`
+and uses the `defined` balancer. Edit `balancer_type` to `round-robin`
+if you want a single flat list:
 
 ```yaml
-balancer_type: purposeful # or round-robin
+balancer_type: round-robin
 ```
+
+## Configuration
+
+Otter loads config from the YAML file pointed to by `CONFIG_FILE`, with
+environment variables taking precedence over file values for every knob
+that has an env override. The Docker compose example uses
+`manifest/config_docker.yaml`; local runs usually point at
+`manifest/config.yaml`.
+
+Main knobs (defined in `internal/config/config.go`):
+
+| YAML key              | Env var              | Default       | Purpose                                                        |
+|-----------------------|----------------------|---------------|----------------------------------------------------------------|
+| `balancer_type`       | `BALANCER_TYPE`      | `round-robin` | `round-robin`, `defined`, or `purposeful`                      |
+| `dgraph_endpoints`    | `DGRAPH_ENDPOINTS`   | &mdash;       | Comma-separated alpha endpoints used by round-robin            |
+| `groups`              | &mdash;              | &mdash;       | Per-purpose endpoint map (`query`, `mutation`, `upsert`)       |
+| `proxy_port`          | `PROXY_PORT`         | `8080`        | HTTP port; Docker example uses `8084`                          |
+| `websocket_port`      | `WEBSOCKET_PORT`     | `8089`        | WebSocket port                                                 |
+| `enable_http`         | `ENABLE_HTTP`        | `true`        | Toggles the HTTP proxy server                                  |
+| `enable_websocket`    | `ENABLE_WEBSOCKET`   | `true`        | Toggles the WebSocket server                                   |
+| `graphql`             | `GRAPHQL`            | `true`        | Enables the `/graphql` pass-through                            |
+| `dgraph_user`         | `DGRAPH_USER`        | empty         | Dgraph ACL user; optional                                      |
+| `dgraph_password`     | `DGRAPH_PASSWORD`    | empty         | Dgraph ACL password; never logged                              |
+| `dev_mode`            | `DEV_MODE`           | `true`        | Enables dev-only safety defaults; set `false` for production   |
+| `ws_token`            | `WS_TOKEN`           | auto in dev   | WebSocket auth token; required when `dev_mode: false`          |
+| `ws_allowed_origins`  | `WS_ALLOWED_ORIGINS` | empty         | Origin allow-list; required when `dev_mode: false`             |
+| `max_body_bytes`      | `MAX_BODY_BYTES`     | `1048576`     | HTTP request body cap (1 MiB)                                  |
+| `ratel`               | `RATEL`              | empty         | Ratel UI host for the `/ratel` redirect                        |
+| `ratel_graphql`       | `RATEL_GRAPHQL`      | `true`        | Whether the Ratel redirect carries GraphQL support             |
+
+`dgraph_password` and `ws_token` are redacted from the startup log dump.
+See `docs/security.md` for the full security contract.
 
 ---
 
-###  HTTP Proxy Endpoints
+## HTTP Proxy Endpoints
 
-| Endpoint   | Method | Description         |
-|------------|--------|---------------------|
-| `/query`   | POST   | Executes a DQL query |
-| `/mutate`  | POST   | Executes a mutation  |
+| Endpoint           | Method   | Description                                                                 |
+|--------------------|----------|-----------------------------------------------------------------------------|
+| `/query`           | POST     | Executes a DQL query via the configured balancer                            |
+| `/mutate`          | POST     | Executes a DQL mutation (including upsert blocks)                           |
+| `/alter`           | POST     | Schema alter; proxies to the selected alpha                                 |
+| `/graphql`         | POST     | Pass-through to Dgraph's `/graphql` (when `graphql: true`)                  |
+| `/health`          | GET      | Aggregated Otter + backend health                                           |
+| `/state`           | GET      | Proxies Dgraph's `/state` for cluster introspection                         |
+| `/admin/schema`    | POST     | GraphQL admin schema update                                                 |
+| `/ui/keywords`     | GET      | Keyword list used by Ratel / the Otter UI                                   |
+| `/validate/dql`    | POST     | Static validation of a DQL body without execution                           |
+| `/validate/schema` | POST     | Static validation of a DQL schema without execution                         |
 
-Supported Content-Types:
+Supported request Content-Types for DQL endpoints:
 
 - `application/json`
 - `application/dql`
 
 Example request (default proxy port is `8084` in the shipped manifests):
+
 ```bash
 curl -X POST http://localhost:8084/query \
   -H "Content-Type: application/json" \
   -d '{"query": "{ data(func: has(email)) { uid name email } }"}'
 ```
 
----
+Request bodies are capped by `max_body_bytes` (default 1 MiB). Bodies
+larger than the cap are rejected by the handler's read path.
 
 ---
 
-### WebSocket Usage
+## WebSocket Usage
 
 **URL**: `ws://localhost:8089/ws`
 
@@ -179,24 +218,25 @@ curl -X POST http://localhost:8084/query \
 > (or the `DEV_MODE`, `WS_TOKEN`, `WS_ALLOWED_ORIGINS` env vars) to run
 > with the fail-closed behaviour. See `docs/security.md` for details.
 
-#### Supported message types:
+Supported message types:
 
-- `auth` -> authenticate
-- `ping` -> keep connection alive
-- `query` / `mutation` / `upsert` → require authentication
+- `auth` &mdash; send first to authenticate the connection
+- `ping` &mdash; keep the connection alive
+- `query` / `mutation` / `upsert` &mdash; require a prior successful `auth`
 
-#### Example (after auth):
+Example (after auth; replace the token with the value configured in
+`ws_token` or the one printed at Otter startup in dev mode):
 
 ```json
 {
   "type": "query",
   "query": "{ data(func: has(email)) { uid name email } }",
-  "token": "banana",
+  "token": "<your ws_token>",
   "verbose": true
 }
 ```
 
-###  Load Balancing Modes
+## Load Balancing Modes
 
 Available types:
 
@@ -221,27 +261,48 @@ empty or any purpose has no usable endpoint.
 
 ---
 
-###  Roadmap
+## Roadmap
 
-Short-term (see `docs/phase1_backlog.md`):
-- [ ] Configurable WebSocket auth token and origin allowlist
-- [ ] HTTP server timeouts and graceful shutdown
-- [ ] Build-tag gating for E2E tests
+Organised by horizon so it matches the backlog that contributors can
+actually pull from. See `docs/phase1_backlog.md` for the ranked version
+with effort and dependency notes.
 
-Mid-term:
-- [ ] `round-robin-healthy` support
-- [ ] `round-robin-on-RW` separate readonly and write only
-- [ ] Cluster state inspection via `/state`
+**Implemented today**
 
-Research (see `why.md` and `internal/loadbalancer/idea.md`):
-- [ ] Leader-aware routing (`round-robin-avoid-leaders`, `round-robin-leaders-only`)
-- [ ] State-based balancing using resource introspection
-- [ ] Graph model abstraction and ontology schemas
-- [ ] Cypher / other transpilers
-- [ ] Become a framework
+- [x] `round-robin` balancer
+- [x] `defined` / `purposeful` balancer with per-purpose groups and
+      startup validation
+- [x] Configurable WebSocket auth token, origin allow-list, and
+      dev-vs-production mode (fail-closed)
+- [x] HTTP server with explicit read/write/idle timeouts, body-size
+      cap, and SIGINT/SIGTERM graceful shutdown
+- [x] Build-tag-gated E2E suite with Docker-backed `make e2e` one-shot
+- [x] Redacted config log dump (password and WS token)
 
-Implemented today:
-- [x] `round-robin` basic round-robin
-- [x] `round-robin-purposeful` / `defined`
+**Now (nearest-term follow-ups)**
+
+- [ ] Structured logging (`log/slog`), request IDs, basic metrics
+- [ ] Translate oversize-body rejections to HTTP 413 explicitly
+- [ ] Basic per-IP rate limiting on `/query`, `/mutate`, `/graphql`, `/ws`
+
+**Next**
+
+- [ ] Health-aware round-robin (`round-robin-healthy`)
+- [ ] Read/write split balancer (`round-robin-on-RW`)
+- [ ] Cluster state inspection that feeds balancer decisions
+- [ ] Container health-checks backed into `docker-compose.yml`
+      (removing the host-side `scripts/wait-for-otter.sh` stopgap)
+
+**Later / research**
+
+Tracked in `why.md` and `internal/loadbalancer/idea.md`. These are
+*vision documents*, not committed scope:
+
+- Leader-aware routing (`round-robin-avoid-leaders`,
+  `round-robin-leaders-only`)
+- State-based balancing using `/state` and resource introspection
+- Graph model abstraction and ontology schemas
+- Cypher / other transpilers (see `internal/astneo`)
+- Otter-as-framework
 
 ---
