@@ -10,9 +10,16 @@ import (
 	"github.com/OpenDgraph/Otter/internal/config"
 )
 
+// EndpointInfo identifies a single backend selected by a balancer.
+//
+// It used to carry a port Offset that predated the gRPC-minus-1000
+// heuristic in internal/proxy.selectBackendHost. That field had zero
+// readers in the repo (verified by `rg '\.Offset' --glob '*.go'`) and
+// was removed as part of the loadbalancer audit. Keeping only the
+// endpoint string keeps the struct a narrow value, easy to extend
+// when cluster-state inspection lands (see docs/loadbalancer_audit.md).
 type EndpointInfo struct {
 	Endpoint string
-	Offset   int
 }
 
 type Balancer interface {
@@ -29,13 +36,12 @@ func NewRoundRobinBalancer(endpoints []string) *RoundRobinBalancer {
 	nodes := make([]EndpointInfo, 0, len(endpoints))
 
 	for _, ep := range endpoints {
-		offset, err := inferPort(ep)
-		if err != nil {
+		if err := validateEndpoint(ep); err != nil {
 			log.Printf("Warning: Ignoring endpoint '%s' in balancer: %v", ep, err)
 			continue
 		}
-		nodes = append(nodes, EndpointInfo{Endpoint: ep, Offset: offset})
-		log.Printf("Info: Endpoint '%s' added to balancer with offset %d", ep, offset)
+		nodes = append(nodes, EndpointInfo{Endpoint: ep})
+		log.Printf("Info: Endpoint '%s' added to balancer", ep)
 	}
 
 	if len(nodes) == 0 {
@@ -62,24 +68,27 @@ func (b *RoundRobinBalancer) Next() EndpointInfo {
 	return node
 }
 
-func inferPort(endpoint string) (int, error) {
-	endpoint = strings.TrimPrefix(endpoint, "http://")
-	endpoint = strings.TrimPrefix(endpoint, "https://")
+// validateEndpoint rejects endpoint strings that the balancer cannot
+// sensibly route to. It accepts either a `host:port` form or a URL
+// prefixed with `http://` / `https://` (historically tolerated by this
+// code path; neither shipped manifest uses it).
+//
+// A non-numeric or missing port is an error; the caller skips the
+// endpoint with a warning rather than failing the whole balancer.
+func validateEndpoint(endpoint string) error {
+	trimmed := strings.TrimPrefix(endpoint, "http://")
+	trimmed = strings.TrimPrefix(trimmed, "https://")
 
-	lastColon := strings.LastIndex(endpoint, ":")
+	lastColon := strings.LastIndex(trimmed, ":")
 	if lastColon == -1 {
-		return 0, fmt.Errorf("port not found in endpoint: %s", endpoint)
+		return fmt.Errorf("port not found in endpoint: %s", endpoint)
 	}
 
-	portStr := endpoint[lastColon+1:]
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return 0, fmt.Errorf("invalid port '%s' in endpoint '%s': %w", portStr, endpoint, err)
+	portStr := trimmed[lastColon+1:]
+	if _, err := strconv.Atoi(portStr); err != nil {
+		return fmt.Errorf("invalid port %q in endpoint %q: %w", portStr, endpoint, err)
 	}
-
-	offset := port - 9080
-	return offset, nil
+	return nil
 }
 
 func NewBalancer(Config config.Config) (Balancer, error) {
@@ -95,9 +104,11 @@ func NewBalancer(Config config.Config) (Balancer, error) {
 		}
 		return balancer, nil
 	case "round-robin-healthy":
-		// Implement a round-robin healthy-only balancer
-		// that checks the health of endpoints before returning them.
-		return nil, fmt.Errorf("round-robin-healthy balancer is not implemented yet")
+		// Tracked as backlog item X2 (see docs/product_backlog.md).
+		// Depends on the cluster-state inspector (backlog X3). Left as
+		// a reserved name here so operators typing it into YAML get a
+		// directed error instead of "unknown balancer type".
+		return nil, fmt.Errorf("balancer %q is not implemented yet (tracked as backlog item X2); use %q for now", balancerType, "round-robin")
 	default:
 		return nil, fmt.Errorf("unknown balancer type: %s", balancerType)
 	}

@@ -41,6 +41,66 @@ func TestNewBalancer_RejectsUnknownType(t *testing.T) {
 	}
 }
 
+func TestNewBalancer_RoundRobinHealthyErrorReferencesBacklog(t *testing.T) {
+	_, err := NewBalancer(config.Config{
+		DgraphEndpoints: []string{"localhost:9080"},
+		BalancerType:    "round-robin-healthy",
+	})
+	if err == nil {
+		t.Fatalf("expected error for unimplemented balancer type")
+	}
+	msg := err.Error()
+	// The message must point the operator at a real next action rather
+	// than a terse "not implemented".
+	for _, needle := range []string{"round-robin-healthy", "X2", "round-robin"} {
+		if !strings.Contains(msg, needle) {
+			t.Errorf("expected error to contain %q, got %q", needle, msg)
+		}
+	}
+}
+
+func TestValidateEndpoint(t *testing.T) {
+	cases := []struct {
+		name    string
+		in      string
+		wantErr bool
+	}{
+		{"host and numeric port", "localhost:9080", false},
+		{"ipv4 and numeric port", "127.0.0.1:9080", false},
+		{"http scheme tolerated", "http://localhost:9080", false},
+		{"https scheme tolerated", "https://localhost:9080", false},
+		{"missing port", "localhost", true},
+		{"empty string", "", true},
+		{"non-numeric port", "localhost:grpc", true},
+		{"trailing colon", "localhost:", true},
+	}
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			err := validateEndpoint(c.in)
+			if c.wantErr && err == nil {
+				t.Fatalf("expected error for %q, got nil", c.in)
+			}
+			if !c.wantErr && err != nil {
+				t.Fatalf("expected no error for %q, got %v", c.in, err)
+			}
+		})
+	}
+}
+
+func TestNewRoundRobinBalancer_SkipsInvalidEndpoints(t *testing.T) {
+	// Mixed input: one valid, two invalid. The balancer must keep the
+	// valid one and silently skip the rest rather than panicking on
+	// Next().
+	b := NewRoundRobinBalancer([]string{"localhost:9080", "no-port-here", "host:notaport"})
+	if got := b.Next().Endpoint; got != "localhost:9080" {
+		t.Fatalf("expected only valid endpoint to be selected, got %q", got)
+	}
+	if got := b.Next().Endpoint; got != "localhost:9080" {
+		t.Fatalf("expected single-endpoint balancer to repeat, got %q", got)
+	}
+}
+
 func TestValidatePurposeful_RejectsEmptyGroups(t *testing.T) {
 	b := NewPurposefulBalancer(config.Config{})
 	err := ValidatePurposeful(b)
