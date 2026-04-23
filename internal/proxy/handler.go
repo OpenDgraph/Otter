@@ -55,14 +55,19 @@ func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if upserts != nil {
+		if len(upserts) == 0 {
+			helpers.WriteJSONError(w, http.StatusBadRequest, "upsert array is empty")
+			return
+		}
+
 		var wg sync.WaitGroup
 		var mu sync.Mutex
-		var responses []*api.Response
+		responses := make([]*api.Response, len(upserts))
 		var errs []string
 
-		for _, up := range upserts {
+		for i, up := range upserts {
 			wg.Add(1)
-			go func(up *helpers.UpsertBlock) {
+			go func(idx int, up *helpers.UpsertBlock) {
 				defer wg.Done()
 				mut := &api.Mutation{
 					SetNquads: []byte(up.Mutation),
@@ -73,10 +78,10 @@ func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
 				defer mu.Unlock()
 				if err != nil {
 					errs = append(errs, err.Error())
-				} else {
-					responses = append(responses, resp)
+					return
 				}
-			}(up)
+				responses[idx] = resp
+			}(i, up)
 		}
 
 		wg.Wait()
@@ -86,7 +91,11 @@ func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		helpers.WriteJSONResponse(w, http.StatusOK, responses[0])
+		if len(upserts) == 1 {
+			helpers.WriteJSONResponse(w, http.StatusOK, responses[0])
+			return
+		}
+		helpers.WriteJSONResponseList(w, http.StatusOK, responses)
 		return
 	}
 

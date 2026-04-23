@@ -5,10 +5,18 @@ import (
 	"strings"
 )
 
+// isDQL is a best-effort heuristic to distinguish DQL from GraphQL at the
+// HTTP surface. It is intentionally conservative: it treats a request as DQL
+// when a non-comment, non-empty line mentions the canonical DQL marker
+// "func:" or the schema-introspection literal "schema {}". Callers should
+// not rely on this for security-sensitive routing.
 func isDQL(src string) bool {
 	for _, line := range strings.Split(src, "\n") {
 		line = strings.TrimSpace(line)
-		if len(line) > 0 && !strings.HasPrefix(line, "#") && strings.Contains(line, "func:") || strings.Contains(line, "schema {}") {
+		if len(line) == 0 || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.Contains(line, "func:") || strings.Contains(line, "schema {}") {
 			return true
 		}
 	}

@@ -5,12 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/dgraph-io/dgo/v240"
 	"github.com/dgraph-io/dgo/v240/protos/api"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
+
+// defaultDgraphEndpoint matches the port exposed by examples/cluster/docker-compose.yml.
+// Override with DGRAPH_GRPC when running the seeder against a different cluster.
+const defaultDgraphEndpoint = "localhost:9081"
 
 func setupSchema(dg *dgo.Dgraph) {
 	ctx := context.Background()
@@ -70,9 +75,16 @@ func main() {
 		dgo.WithGrpcOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 	}
 
-	dg, err := dgo.NewClient("localhost:9080", opts...)
+	endpoint := os.Getenv("DGRAPH_GRPC")
+	if endpoint == "" {
+		endpoint = defaultDgraphEndpoint
+	}
+	log.Printf("Seeding Dgraph at %s", endpoint)
+
+	dg, err := dgo.NewClient(endpoint, opts...)
 	if err != nil {
-		fmt.Println("could not create Dgraph client: %w", err)
+		fmt.Printf("could not create Dgraph client: %v\n", err)
+		return
 	}
 	setup(dg)
 }

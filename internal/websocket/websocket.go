@@ -12,14 +12,33 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Upgrader is responsible for upgrading HTTP requests to WebSocket connections.
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		// Allow all connections (not safe for production)
-		return true
-	},
+// newUpgrader builds a WebSocket upgrader whose CheckOrigin honours the
+// supplied allow-list. When allowedOrigins is empty AND devMode is true, the
+// upgrader accepts any origin and logs a single warning on startup; this is
+// the explicit dev-only behaviour. When allowedOrigins is empty and devMode
+// is false, every connection is rejected (validateSecurity should already
+// have prevented this case, but we fail closed defensively).
+func newUpgrader(allowedOrigins []string, devMode bool) websocket.Upgrader {
+	return websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			if len(allowedOrigins) == 0 {
+				if devMode {
+					return true
+				}
+				return false
+			}
+			if origin == "" {
+				// Same-origin WS upgrades from non-browser clients commonly
+				// omit the header. In strict mode we reject to keep the
+				// decision boundary obvious.
+				return false
+			}
+			return MatchOrigin(origin, allowedOrigins)
+		},
+	}
 }
 
 func checkAuth(authenticated bool, conn *websocket.Conn) bool {
@@ -31,6 +50,15 @@ func checkAuth(authenticated bool, conn *websocket.Conn) bool {
 }
 
 func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
+	cfg := p.Config()
+	devMode := cfg.DevMode != nil && *cfg.DevMode
+	upgrader := newUpgrader(cfg.WSAllowedOrigins, devMode)
+
+	expectedToken := cfg.WSToken
+	tokenValid := func(t string) bool {
+		return ConstantTimeTokenEqual(t, expectedToken)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -70,7 +98,7 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 				conn.WriteMessage(websocket.TextMessage, []byte(`{"status":"pong"}`))
 
 			case TypeAuth:
-				if IsValidToken(msg.Token) {
+				if tokenValid(msg.Token) {
 					authenticated = true
 					conn.WriteMessage(websocket.TextMessage, []byte(`{"status":"authenticated"}`))
 				} else {
@@ -154,7 +182,9 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 				}
 				_, client, err := p.SelectClientAuto("upsert")
 				if err != nil {
-					conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"%v"}`))
+					out := WSResponse{Error: err.Error()}
+					b, _ := json.Marshal(out)
+					conn.WriteMessage(websocket.TextMessage, b)
 					continue
 				}
 

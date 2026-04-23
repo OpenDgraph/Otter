@@ -25,14 +25,44 @@ Current design.
 
 ### Features
 
--  Round-robin and purpose-based balancing
--  HTTP proxy for Dgraph `/query` and `/mutate`
--  WebSocket server with support for `query`, `mutation`, and `upsert`
--  Simple token-based authentication
--  Configurable via environment variables or YAML
--  Otter now supports GraphQL queries via Ratel. Just enable the experimental feature `ratel-graphql: true`
+-  Round-robin and purposeful load balancing across Dgraph alphas
+-  HTTP proxy for Dgraph `/query`, `/mutate`, `/alter`, `/health`, `/state`,
+   `/admin/schema`, `/ui/keywords`
+-  WebSocket server with support for `auth`, `ping`, `query`, `mutation`, `upsert`
+-  GraphQL pass-through to Dgraph's `/graphql` endpoint when enabled
+-  Configurable via YAML and environment variables
+
+### Current Status
+
+- Working today: the items listed above, against a local Dgraph cluster.
+- Experimental / dev-only: WebSocket auth is a single hardcoded token
+  (`"banana"`) and accepts every `Origin`. See `docs/repo_audit.md` for
+  details and `docs/phase1_backlog.md` for the planned hardening.
+- Not implemented yet despite appearing in the roadmap: health-aware
+  balancing, leader-aware routing, Cypher transpilation, and the framework
+  features from `why.md` and `internal/loadbalancer/idea.md`. Those remain
+  research directions.
+- Dgraph version posture: the Go module depends on `hypermodeinc/dgraph/v24`
+  for GraphQL schema handling, while `examples/cluster/docker-compose.yml`
+  pins `dgraph/dgraph:v25.0.0-preview1`. gRPC traffic is compatible in
+  practice but schema behaviour is not guaranteed across majors; smoke-test
+  before relying on it.
 
 ---
+
+## Development Workflow
+
+Full step-by-step commands live in `docs/runbook.md`. Short version:
+
+- `make test` / `make test-unit` &mdash; fast local tests, no Docker.
+- `make e2e-up` + `make e2e-wait` &mdash; boot the Docker stack and wait
+  until Otter answers on `/health` and `/query`.
+- `make test-e2e` &mdash; run the Docker-backed suite (build tag `e2e`).
+- `make e2e` &mdash; one-shot: up, wait, seed, test, tear down.
+- `make e2e-down` &mdash; stop the stack and drop its named volumes.
+
+`go test ./...` only runs unit tests; the E2E suite is gated by the
+`e2e` build tag so a clean checkout stays green without Docker.
 
 ## Run Otter with Docker
 
@@ -49,7 +79,9 @@ Requirements
 #### Run with make
 
 ```bash
-make rund
+make rund          # foreground, logs streamed
+# or
+make e2e-up        # background; pair with make e2e-wait
 ```
 
  Manual Docker Compose
@@ -123,9 +155,9 @@ Supported Content-Types:
 - `application/json`
 - `application/dql`
 
-Example request:
+Example request (default proxy port is `8084` in the shipped manifests):
 ```bash
-curl -X POST http://localhost:8080/query \
+curl -X POST http://localhost:8084/query \
   -H "Content-Type: application/json" \
   -d '{"query": "{ data(func: has(email)) { uid name email } }"}'
 ```
@@ -137,6 +169,15 @@ curl -X POST http://localhost:8080/query \
 ### WebSocket Usage
 
 **URL**: `ws://localhost:8089/ws`
+
+> Otter ships with `dev_mode: true` by default, which means the WebSocket
+> handler auto-generates a random auth token on startup (logged once) and
+> accepts every `Origin`. The Docker example pins `ws_token: "banana"` for
+> reproducibility &mdash; change it before exposing port 8089.
+>
+> Set `dev_mode: false` and provide `ws_token` and `ws_allowed_origins`
+> (or the `DEV_MODE`, `WS_TOKEN`, `WS_ALLOWED_ORIGINS` env vars) to run
+> with the fail-closed behaviour. See `docs/security.md` for details.
 
 #### Supported message types:
 
@@ -160,7 +201,7 @@ curl -X POST http://localhost:8080/query \
 Available types:
 
 - `round-robin` *(default)*
-- `defined` *(per-purpose: query/mutation/upsert)*
+- `defined` or `purposeful` *(per-purpose: query/mutation/upsert)*
 
 To use `defined`, provide a YAML like this:
 
@@ -175,21 +216,32 @@ groups:
     - localhost:9082
 ```
 
+Otter now validates `groups` at startup and fails fast when the map is
+empty or any purpose has no usable endpoint.
+
 ---
 
 ###  Roadmap
 
-- [ ] Automatic health checks
-- [ ] Support for multiple Balancing strategies
-- [ ] Graph model abstraction
-- [ ] Become a framework
+Short-term (see `docs/phase1_backlog.md`):
+- [ ] Configurable WebSocket auth token and origin allowlist
+- [ ] HTTP server timeouts and graceful shutdown
+- [ ] Build-tag gating for E2E tests
 
-More purposeful Balancing strategies:
-- [x] `round-robin` basic round-robin
-- [x] `round-robin-purposeful` with purpose
+Mid-term:
 - [ ] `round-robin-healthy` support
 - [ ] `round-robin-on-RW` separate readonly and write only
-- [ ] `round-robin-avoid-leaders` avoid leaders
-- [ ] `round-robin-leaders-only` leaders only
-- [ ] `round-robin-state-based` this will check the state of the Alpha and check memory usage and coroutine count
+- [ ] Cluster state inspection via `/state`
+
+Research (see `why.md` and `internal/loadbalancer/idea.md`):
+- [ ] Leader-aware routing (`round-robin-avoid-leaders`, `round-robin-leaders-only`)
+- [ ] State-based balancing using resource introspection
+- [ ] Graph model abstraction and ontology schemas
+- [ ] Cypher / other transpilers
+- [ ] Become a framework
+
+Implemented today:
+- [x] `round-robin` basic round-robin
+- [x] `round-robin-purposeful` / `defined`
+
 ---

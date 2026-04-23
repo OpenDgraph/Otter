@@ -4,15 +4,31 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/vektah/gqlparser/v2"
+	"github.com/hypermodeinc/dgraph/v24/graphql/schema"
+	"github.com/pkg/errors"
 	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/parser"
+	"github.com/vektah/gqlparser/v2/validator"
 )
 
 func ParseSchema(input string) (*ast.Schema, error) {
-	return gqlparser.LoadSchema(&ast.Source{
-		Name:  "schema.graphql",
-		Input: input,
-	})
+	newinput := strings.TrimSpace(input)
+	schHandler, err := schema.NewHandler(newinput, false)
+	if err != nil {
+		return nil, err
+	}
+
+	schema_ := schHandler.GQLSchema()
+
+	doc, gqlErr := parser.ParseSchemas(validator.Prelude, &ast.Source{Input: schema_})
+	if gqlErr != nil {
+		return nil, errors.Wrap(gqlErr, "while parsing GraphQL schema")
+	}
+	gqlSchema, gqlErr := validator.ValidateSchemaDocument(doc)
+	if gqlErr != nil {
+		return nil, errors.Wrap(gqlErr, "while validating GraphQL schema")
+	}
+	return gqlSchema, nil
 }
 
 type GraphNode struct {
@@ -31,6 +47,10 @@ func isMutation(t *ast.Definition) bool {
 	return t.Kind == ast.Object && t.Name == "Mutation"
 }
 
+func isInternal(t *ast.Definition) bool {
+	return t.Kind == "ENUM" && t.Name == "Mode" || t.Name == "HTTPMethod"
+}
+
 func isInputObject(t *ast.Definition) bool {
 	return t.Kind == ast.InputObject
 }
@@ -43,7 +63,8 @@ func SchemaToJSON(schema *ast.Schema) ([]byte, error) {
 	var nodes []GraphNode
 
 	for _, typ := range schema.Types {
-		if isMutation(typ) || isInputObject(typ) || isScalar(typ) || isIntrospectionType(typ.Name) || !isUserDefined(typ) {
+		if isMutation(typ) || isInputObject(typ) || isScalar(typ) || isIntrospectionType(typ.Name) ||
+			!isUserDefined(typ) || isOther(typ.Name) || isInternal(typ) {
 			continue
 		}
 
@@ -58,6 +79,15 @@ func SchemaToJSON(schema *ast.Schema) ([]byte, error) {
 
 func isIntrospectionType(name string) bool {
 	return strings.HasPrefix(name, "__")
+}
+
+func isOther(name string) bool {
+	start := strings.HasPrefix(name, "Delete") || strings.HasPrefix(name, "Update")
+	end := strings.HasSuffix(name, "Payload") || strings.HasSuffix(name, "Orderable")
+
+	combined := strings.Contains(name, "AggregateResult") || name == "Point" || name == "Polygon" ||
+		name == "PointList" || strings.HasSuffix(name, "HasFilter") || name == "DgraphIndex" || name == "MultiPolygon"
+	return start || end || combined
 }
 
 func buildNode(schema *ast.Schema, typeName string, visited map[string]GraphNode) GraphNode {

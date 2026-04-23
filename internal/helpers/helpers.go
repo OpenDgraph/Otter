@@ -78,18 +78,30 @@ func CheckMutationBody(contentType string, body []byte) (*api.Mutation, []*Upser
 			var blocks []*UpsertBlock
 			switch up := rawUpsert.(type) {
 			case map[string]interface{}:
+				if len(up) == 0 {
+					return nil, nil, fmt.Errorf("| 'upsert' object is empty")
+				}
 				b, _ := json.Marshal(up)
 				var blk UpsertBlock
 				if err := json.Unmarshal(b, &blk); err != nil {
 					return nil, nil, fmt.Errorf("| Invalid upsert block: %w", err)
 				}
+				if blk.Query == "" || blk.Mutation == "" {
+					return nil, nil, fmt.Errorf("| upsert block missing 'query' or 'mutation'")
+				}
 				blocks = append(blocks, &blk)
 			case []interface{}:
+				if len(up) == 0 {
+					return nil, nil, fmt.Errorf("| 'upsert' array is empty")
+				}
 				for _, item := range up {
 					b, _ := json.Marshal(item)
 					var blk UpsertBlock
 					if err := json.Unmarshal(b, &blk); err != nil {
 						return nil, nil, fmt.Errorf("| Invalid upsert block in array: %w", err)
+					}
+					if blk.Query == "" || blk.Mutation == "" {
+						return nil, nil, fmt.Errorf("| upsert block missing 'query' or 'mutation'")
 					}
 					blocks = append(blocks, &blk)
 				}
@@ -160,6 +172,14 @@ func WriteJSONResponse(w http.ResponseWriter, status int, resp *api.Response) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 
+	if resp == nil {
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"data":       map[string]interface{}{},
+			"extensions": map[string]interface{}{},
+		})
+		return
+	}
+
 	data := map[string]interface{}{}
 	if len(resp.Json) > 0 {
 		if err := json.Unmarshal(resp.Json, &data); err != nil {
@@ -220,4 +240,50 @@ func WriteJSONResponse(w http.ResponseWriter, status int, resp *api.Response) {
 	}
 
 	_ = json.NewEncoder(w).Encode(final)
+}
+
+// WriteJSONResponseList serializes multiple Dgraph responses (for example the
+// result of a multi-block upsert) into a single JSON envelope. Nil entries
+// are preserved as null in the output so callers can correlate by index.
+func WriteJSONResponseList(w http.ResponseWriter, status int, resps []*api.Response) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+
+	items := make([]map[string]interface{}, 0, len(resps))
+	for _, resp := range resps {
+		if resp == nil {
+			items = append(items, map[string]interface{}{
+				"data":       map[string]interface{}{},
+				"extensions": map[string]interface{}{},
+			})
+			continue
+		}
+		data := map[string]interface{}{}
+		if len(resp.Json) > 0 {
+			if err := json.Unmarshal(resp.Json, &data); err != nil {
+				items = append(items, map[string]interface{}{
+					"error": "error parsing response JSON",
+				})
+				continue
+			}
+		}
+		ext := map[string]interface{}{}
+		if len(resp.Uids) > 0 {
+			ext["uids"] = resp.Uids
+		}
+		if resp.Txn != nil {
+			ext["txn"] = map[string]interface{}{
+				"start_ts":  resp.Txn.GetStartTs(),
+				"commit_ts": resp.Txn.GetCommitTs(),
+			}
+		}
+		items = append(items, map[string]interface{}{
+			"data":       data,
+			"extensions": ext,
+		})
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"results": items,
+	})
 }

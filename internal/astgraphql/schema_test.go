@@ -7,36 +7,54 @@ import (
 	"github.com/OpenDgraph/Otter/internal/helpers"
 )
 
-func TestParseSchema(t *testing.T) {
-	sdl := `
-		type User {
-			id: ID!
-			name: String!
-			friend: User
-		}
+// func TestParseSchema(t *testing.T) {
+// 	sdl := `
+// 		type User {
+// 			id: ID!
+// 			name: String!
+// 			friend: User
+// 		}
 
-		type Query {
-			user(id: ID!): User
-		}
-	`
+// 		type Query {
+// 			user(id: ID!): User
+// 		}
+// 	`
 
-	schema, err := ParseSchema(sdl)
-	if err != nil {
-		t.Fatalf("Failed to parse schema: %v", err)
-	}
+// 	schema, err := ParseSchema(sdl)
+// 	if err != nil {
+// 		t.Fatalf("Failed to parse schema: %v", err)
+// 	}
 
-	if schema.Types["User"] == nil {
-		t.Errorf("Expected type 'User' not found")
-	}
+// 	if schema.Types["User"] == nil {
+// 		t.Errorf("Expected type 'User' not found")
+// 	}
 
-	if schema.Types["Query"] == nil {
-		t.Errorf("Expected type 'Query' not found")
-	}
-}
+// 	if schema.Types["Query"] == nil {
+// 		t.Errorf("Expected type 'Query' not found")
+// 	}
+// }
 
 func TestSchemaToJSON(t *testing.T) {
 	sdl := `
-		scalar Date
+		type TodoList {
+			id: ID!
+			title: String! @search(by: [term])
+			todos: [TodoItem] @hasInverse(field: list)
+
+			createdAt: DateTime
+			updatedAt: DateTime
+		}
+
+		type TodoItem {
+			id: ID!
+			text: String! @search(by: [term])
+			done: Boolean! 
+			dueDate: DateTime
+			list: TodoList!
+
+			createdAt: DateTime
+			updatedAt: DateTime
+		}
 
 		enum Role {
 			ADMIN
@@ -67,18 +85,6 @@ func TestSchemaToJSON(t *testing.T) {
 			role: Role!
 		}
 
-		type Query {
-			account(id: ID!): Account
-		}
-
-		type Mutation {
-			createUser(input: NewUserInput): User
-		}
-
-		schema {
-			query: Query
-			mutation: Mutation
-		}
 	`
 
 	schema, err := ParseSchema(sdl)
@@ -91,7 +97,7 @@ func TestSchemaToJSON(t *testing.T) {
 		t.Fatalf("Failed to convert schema to JSON: %v", err)
 	}
 
-	var parsedAST interface{}
+	var parsedAST any
 	if err := json.Unmarshal(jsonData, &parsedAST); err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
 	}

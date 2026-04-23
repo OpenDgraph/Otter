@@ -1,20 +1,62 @@
  
-type TodoList {
-  id: ID!
-  title: String! @search(by: [term])
-  todos: [TodoItem] @hasInverse(field: list)
+    type TodoList {
+      id: ID!
+      title: String! @search(by: [term])
+      todos: [TodoItem] @hasInverse(field: list)
 
-  createdAt: DateTime
-  updatedAt: DateTime
-}
+      createdAt: DateTime
+      updatedAt: DateTime
+    }
 
-type TodoItem {
-  id: ID!
-  text: String! @search(by: [term])
-  done: Boolean! 
-  dueDate: DateTime
-  list: TodoList!
+    type TodoItem {
+      id: ID!
+      text: String! @search(by: [term])
+      done: Boolean! 
+      dueDate: DateTime
+      list: TodoList!
 
-  createdAt: DateTime
-  updatedAt: DateTime
-}
+      createdAt: DateTime
+      updatedAt: DateTime
+    }
+
+		enum Role {
+			ADMIN
+			USER
+			GUEST
+		}
+
+		interface Entity {
+			id: ID!
+		}
+
+		type User implements Entity {
+			id: ID!
+			name: String!
+			role: Role
+			friend: User
+		}
+
+		type Admin implements Entity {
+			id: ID!
+			powers: [String!]!
+		}
+
+		union Account = User | Admin
+
+		input NewUserInput {
+			name: String!
+			role: Role!
+		}
+
+		type Query {
+			account(id: ID!): Account
+		}
+
+		type Mutation {
+			createUser(input: NewUserInput): User
+		}
+
+		schema {
+			query: Query
+			mutation: Mutation
+		}

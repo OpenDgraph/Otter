@@ -62,6 +62,13 @@ func NewProxy(balancer loadbalancer.Balancer, Config config.Config) (*Proxy, err
 	}, nil
 }
 
+// Config returns a copy of the configuration the Proxy was built with.
+// Handlers outside this package should prefer this accessor over reaching
+// into unexported fields.
+func (p *Proxy) Config() config.Config {
+	return p.configs
+}
+
 func (p *Proxy) selectBackendHost(purpose, protocol string) (string, error) {
 	var endpointInfo loadbalancer.EndpointInfo
 	var err error

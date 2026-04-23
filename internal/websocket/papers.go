@@ -10,14 +10,17 @@ import (
 
 const maxAuthAttempts = 8
 
-func (m *WSMessage) ValidatePapers(conn *websocket.Conn) bool {
+// ValidatePapers runs a bounded auth challenge loop against the supplied
+// expectedToken. It is kept for callers that still use the pre-main
+// authentication flow; the live handler in HandleWebSocketWithProxy uses a
+// per-message check driven by the same expected token.
+func (m *WSMessage) ValidatePapers(conn *websocket.Conn, expectedToken string) bool {
 	authAttempts := 0
 
 	for authAttempts < maxAuthAttempts {
-		if !IsValidToken(m.Token) {
+		if !ConstantTimeTokenEqual(m.Token, expectedToken) {
 			authAttempts++
 			conn.WriteMessage(websocket.TextMessage, []byte(`{"error":"papers please!"}`))
-			// time.Sleep(3 * time.Second)
 			if authAttempts >= maxAuthAttempts {
 				time.Sleep(3 * time.Second)
 				conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "Go away! bye!"))
@@ -42,8 +45,4 @@ func (m *WSMessage) ValidatePapers(conn *websocket.Conn) bool {
 	}
 
 	return false
-}
-
-func IsValidToken(token string) bool {
-	return token == "banana"
 }

@@ -6,9 +6,17 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/OpenDgraph/Otter/internal/helpers"
 )
+
+// graphqlUpstreamClient bounds the time Otter is willing to wait for the
+// backend Dgraph /graphql endpoint. A hanging backend would otherwise pin a
+// handler goroutine and a reverse-proxy connection until the OS timed out.
+var graphqlUpstreamClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
 
 func (p *Proxy) forwardGraphQL(body []byte, w http.ResponseWriter, r *http.Request) {
 	const purpose = "query"
@@ -31,7 +39,7 @@ func (p *Proxy) forwardGraphQL(body []byte, w http.ResponseWriter, r *http.Reque
 	}
 	req2.Header = r.Header.Clone()
 
-	resp2, err := http.DefaultClient.Do(req2)
+	resp2, err := graphqlUpstreamClient.Do(req2)
 	if err != nil {
 		helpers.WriteJSONError(w, http.StatusServiceUnavailable, err.Error())
 		return
