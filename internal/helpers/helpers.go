@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +24,29 @@ func ReadRequestBody(r *http.Request) ([]byte, error) {
 
 	r.Body.Close()
 	return bodyBytes, nil
+}
+
+// MaxBodyLimit extracts the configured MaxBytesReader limit from an error
+// returned by ReadRequestBody.
+func MaxBodyLimit(err error) (int64, bool) {
+	if err == nil {
+		return 0, false
+	}
+	var maxErr *http.MaxBytesError
+	if errors.As(err, &maxErr) {
+		return maxErr.Limit, true
+	}
+	return 0, false
+}
+
+// WriteRequestBodyReadError maps MaxBytesReader failures to HTTP 413 and
+// falls back to the supplied bad-request message for every other read error.
+func WriteRequestBodyReadError(w http.ResponseWriter, err error, fallback string) {
+	if limit, ok := MaxBodyLimit(err); ok {
+		WriteJSONError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("Request body exceeds max_body_bytes limit (%d bytes).", limit))
+		return
+	}
+	WriteJSONError(w, http.StatusBadRequest, fallback)
 }
 
 func CheckQueryBody(contentType string, body []byte) (string, error) {

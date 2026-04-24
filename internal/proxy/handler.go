@@ -16,7 +16,7 @@ import (
 func (p *Proxy) HandleQuery(w http.ResponseWriter, r *http.Request) {
 	body, err := helpers.ReadRequestBody(r)
 	if err != nil {
-		helpers.WriteJSONError(w, http.StatusBadRequest, "Error reading request body")
+		helpers.WriteRequestBodyReadError(w, err, "Error reading request body")
 		return
 	}
 
@@ -37,7 +37,7 @@ func (p *Proxy) HandleQuery(w http.ResponseWriter, r *http.Request) {
 func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
 	body, err := helpers.ReadRequestBody(r)
 	if err != nil {
-		helpers.WriteJSONError(w, http.StatusBadRequest, "Error reading request body")
+		helpers.WriteRequestBodyReadError(w, err, "Error reading request body")
 		return
 	}
 

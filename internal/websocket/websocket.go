@@ -70,6 +70,7 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 			log.Printf("| Closing connection: %s\n", conn.RemoteAddr())
 			conn.Close()
 		}()
+		applyReadLimit(conn, cfg.WSMaxMessageBytes)
 
 		log.Printf("| Client connected: %s\n", conn.RemoteAddr())
 
@@ -223,4 +224,11 @@ func HandleWebSocketWithProxy(p *proxy.Proxy) http.HandlerFunc {
 			}
 		}
 	}
+}
+
+func applyReadLimit(conn *websocket.Conn, limit int64) {
+	if conn == nil || limit <= 0 {
+		return
+	}
+	conn.SetReadLimit(limit)
 }

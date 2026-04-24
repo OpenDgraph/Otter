@@ -188,3 +188,45 @@ func TestLoadConfig_DoesNotLogPassword(t *testing.T) {
 		t.Fatalf("password leaked into logs:\n%s", buf.String())
 	}
 }
+
+func TestLoadConfig_DefaultsWSMaxMessageBytes(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	body := "balancer_type: round-robin\n" +
+		"dgraph_endpoints:\n  - localhost:9080\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("CONFIG_FILE", path)
+	t.Setenv("WS_MAX_MESSAGE_BYTES", "")
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+	if cfg.WSMaxMessageBytes != DefaultWSMaxMessageBytes {
+		t.Fatalf("WSMaxMessageBytes = %d, want %d", cfg.WSMaxMessageBytes, DefaultWSMaxMessageBytes)
+	}
+}
+
+func TestLoadConfig_WSMaxMessageBytesEnvOverride(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	body := "balancer_type: round-robin\n" +
+		"dgraph_endpoints:\n  - localhost:9080\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("CONFIG_FILE", path)
+	t.Setenv("WS_MAX_MESSAGE_BYTES", "2048")
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+	if cfg.WSMaxMessageBytes != 2048 {
+		t.Fatalf("WSMaxMessageBytes = %d, want 2048", cfg.WSMaxMessageBytes)
+	}
+}

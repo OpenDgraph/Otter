@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -45,6 +46,16 @@ func TestValidateDQLHandler(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), `"error":"Request body is empty`)
 	})
 
+	t.Run("Body Too Large", func(t *testing.T) {
+		req := newRequest(http.MethodPost, "application/dql", "query { q(func: has(name)) { name } }")
+		rec := httptest.NewRecorder()
+		req.Body = http.MaxBytesReader(rec, req.Body, 8)
+		ValidateDQLHandler(rec, req)
+
+		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+		assert.JSONEq(t, `{"error":"Request body exceeds max_body_bytes limit (8 bytes)."}`, rec.Body.String())
+	})
+
 	t.Run("Valid DQL Query", func(t *testing.T) {
 		query := `query { q(func: has(name)) { name } }`
 		req := newRequest(http.MethodPost, "application/dql", query)
@@ -74,4 +85,15 @@ func TestValidateDQLHandler(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 		assert.True(t, strings.HasPrefix(rec.Body.String(), `{"error":"Failed to parse DQL`), "error message should start with 'Failed to parse DQL'")
 	})
+}
+
+func TestValidateSchemaHandler_BodyTooLarge(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/validate/schema", bytes.NewBufferString("name: string @index(term) ."))
+	rec := httptest.NewRecorder()
+	req.Body = http.MaxBytesReader(rec, req.Body, 8)
+
+	ValidateSchemaHandler(rec, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+	assert.JSONEq(t, `{"error":"Request body exceeds max_body_bytes limit (8 bytes)."}`, rec.Body.String())
 }

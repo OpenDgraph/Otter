@@ -1,30 +1,47 @@
 package proxy
 
 import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-func TestHandleQuery(t *testing.T) {
-	// TODO: Add tests for valid/invalid queries, DQL vs GraphQL routing, and error handling.
+func TestHandleQuery_BodyTooLargeReturns413(t *testing.T) {
+	body := bytes.NewReader([]byte(`{"query":"{ q(func: has(name)) { uid } }"}`))
+	req := httptest.NewRequest(http.MethodPost, "/query", body)
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	req.Body = http.MaxBytesReader(rec, req.Body, 8)
+
+	out := httptest.NewRecorder()
+	(&Proxy{}).HandleQuery(out, req)
+
+	if out.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("HandleQuery status = %d, want %d", out.Code, http.StatusRequestEntityTooLarge)
+	}
+	if !strings.Contains(out.Body.String(), "max_body_bytes limit (8 bytes)") {
+		t.Fatalf("expected 413 body to mention configured limit, got %s", out.Body.String())
+	}
 }
 
-func TestHandleMutation(t *testing.T) {
-	// TODO: Add tests for valid mutation, upserts, error cases, and edge case where all upserts fail (responses is empty).
-}
+func TestHandleMutation_BodyTooLargeReturns413(t *testing.T) {
+	body := bytes.NewReader([]byte(`{"set":{"name":"alice"}}`))
+	req := httptest.NewRequest(http.MethodPost, "/mutate", body)
+	req.Header.Set("Content-Type", "application/json")
 
-func TestHandleMutation_EmptyResponses(t *testing.T) {
-	// Simulate all upserts failing and ensure no panic occurs when responses is empty.
-	// TODO: Implement mock Proxy and helpers for this test.
-}
+	rec := httptest.NewRecorder()
+	req.Body = http.MaxBytesReader(rec, req.Body, 8)
 
-func TestHandleDirect(t *testing.T) {
-	// TODO: Add tests for direct proxying, CORS preflight, and error cases.
-}
+	out := httptest.NewRecorder()
+	(&Proxy{}).HandleMutation(out, req)
 
-func TestHandleGraphQL(t *testing.T) {
-	// TODO: Add tests for GraphQL handler, including valid/invalid requests and error paths.
-}
-
-func TestHandleFrontend(t *testing.T) {
-	// TODO: Add tests for frontend handler, including static file serving and error cases.
+	if out.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("HandleMutation status = %d, want %d", out.Code, http.StatusRequestEntityTooLarge)
+	}
+	if !strings.Contains(out.Body.String(), "max_body_bytes limit (8 bytes)") {
+		t.Fatalf("expected 413 body to mention configured limit, got %s", out.Body.String())
+	}
 }

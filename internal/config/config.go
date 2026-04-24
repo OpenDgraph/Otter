@@ -46,11 +46,16 @@ type Config struct {
 	// MaxBodyBytes caps the size of incoming HTTP request bodies on the
 	// mutate/query/graphql handlers. Zero or negative means "use default".
 	MaxBodyBytes int64 `yaml:"max_body_bytes"`
+
+	// WSMaxMessageBytes caps the size of a single incoming WebSocket message.
+	// Zero or negative means "use default".
+	WSMaxMessageBytes int64 `yaml:"ws_max_message_bytes"`
 }
 
 // Defaults applied by LoadConfig when the operator does not override them.
 const (
-	DefaultMaxBodyBytes int64 = 1 << 20 // 1 MiB
+	DefaultMaxBodyBytes      int64 = 1 << 20 // 1 MiB
+	DefaultWSMaxMessageBytes       = DefaultMaxBodyBytes
 )
 
 func LoadConfig() (*Config, error) {
@@ -345,6 +350,18 @@ func LoadConfig() (*Config, error) {
 	}
 	if cfg.MaxBodyBytes <= 0 {
 		cfg.MaxBodyBytes = DefaultMaxBodyBytes
+	}
+
+	if val := os.Getenv("WS_MAX_MESSAGE_BYTES"); val != "" {
+		parsed, err := strconv.ParseInt(val, 10, 64)
+		if err != nil || parsed <= 0 {
+			log.Printf("Warning: invalid WS_MAX_MESSAGE_BYTES %q; ignoring.", val)
+		} else {
+			cfg.WSMaxMessageBytes = parsed
+		}
+	}
+	if cfg.WSMaxMessageBytes <= 0 {
+		cfg.WSMaxMessageBytes = DefaultWSMaxMessageBytes
 	}
 
 	// Dev-mode auto-generation. We never auto-generate a token in

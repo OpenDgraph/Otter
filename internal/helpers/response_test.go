@@ -1,6 +1,7 @@
 package helpers_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -76,4 +77,31 @@ func TestCheckMutationBody_RejectsUpsertMissingQueryOrMutation(t *testing.T) {
 	body := []byte(`{"upsert": {"query": "only query"}}`)
 	_, _, err := helpers.CheckMutationBody(helpers.ContentTypeJSON, body)
 	require.Error(t, err)
+}
+
+func TestMaxBodyLimit_ExtractsMaxBytesReaderLimit(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte("123456789")))
+	rec := httptest.NewRecorder()
+	req.Body = http.MaxBytesReader(rec, req.Body, 4)
+
+	_, err := helpers.ReadRequestBody(req)
+	require.Error(t, err)
+
+	limit, ok := helpers.MaxBodyLimit(err)
+	require.True(t, ok)
+	require.EqualValues(t, 4, limit)
+}
+
+func TestWriteRequestBodyReadError_MaxBytesReaderMapsTo413(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte("123456789")))
+	rec := httptest.NewRecorder()
+	req.Body = http.MaxBytesReader(rec, req.Body, 4)
+
+	_, err := helpers.ReadRequestBody(req)
+	require.Error(t, err)
+
+	out := httptest.NewRecorder()
+	helpers.WriteRequestBodyReadError(out, err, "fallback")
+	require.Equal(t, http.StatusRequestEntityTooLarge, out.Code)
+	require.JSONEq(t, `{"error":"Request body exceeds max_body_bytes limit (4 bytes)."}`, out.Body.String())
 }
