@@ -5,22 +5,35 @@
 > Built for performance. Designed for graphs.
 
 Otter is a lightweight, purpose-driven proxy and gateway for
-[Dgraph](https://dgraph.io). It balances traffic across Dgraph alphas
-per request purpose (`query` / `mutation` / `upsert`), proxies the HTTP
-admin surface, and exposes a WebSocket gateway that speaks the same
-shapes as the HTTP endpoints.
+[Dgraph](https://dgraph.io). **Dgraph balances reads at the predicate
+level; Otter adds the missing half &mdash; balancing writes across
+alphas.** It routes traffic per request purpose (`query` / `mutation`
+/ `upsert`), proxies the HTTP admin surface, and exposes a WebSocket
+gateway that speaks the same shapes as the HTTP endpoints.
 
-Longer-term, Otter is intended to become the foundation for multiple
-graph languages, semantic enrichment, and introspection tooling.
-Those pieces are **research directions**, not committed work &mdash;
-see the "Later / research" horizon in the roadmap below and the
-notes in `why.md` and `internal/loadbalancer/idea.md`.
+Longer-term, Otter is intended to become the foundation for additional
+graph query languages, introspection tooling, and an opinionated
+graph-modelling convention on top of Dgraph. Those pieces are
+**research directions**, not committed work &mdash; see the
+"Later / research" horizon in the roadmap below and the notes in
+`why.md` and `internal/loadbalancer/idea.md`.
+
+**Not a goal:** supporting GraphQL as a first-class query language.
+Dgraph already ships its own GraphQL layer; Otter only *routes*
+`/graphql` pass-through and *reads* Dgraph's GraphQL schema for
+introspection tooling (e.g. `/ui/keywords`). Transpiling or
+reimplementing GraphQL is explicitly out of scope.
 
 ## Why this software?
 
 Read [why.md](why.md) for the long version. The short version: Dgraph
-is very capable but does not ship an opinionated gateway that spreads
-load per request purpose, and the author wanted one.
+distributes reads across alphas automatically (tablets owned by Raft
+groups), but mutations land on a single alpha and are the practical
+bottleneck for write-heavy workloads. Otter closes that gap by
+letting the operator route each request purpose to a chosen group
+of alphas, and &mdash; as cluster-state inspection lands
+(see `docs/loadbalancer_audit.md`) &mdash; by making that routing
+leader- and health-aware instead of operator-declared.
 
 ---
 
@@ -52,14 +65,15 @@ Current design overview:
   `dev_mode: false` with explicit `ws_token` and `ws_allowed_origins` for
   fail-closed behaviour. See `docs/security.md`.
 - **Experimental / under audit:** the `purposeful` balancer, the GraphQL
-  pass-through, the body-size cap (1 MiB default), and the HTTP server
-  timeouts all ship with conservative defaults that have been smoke-tested
-  end-to-end but not stress-tested.
+  pass-through, the body-size caps (1 MiB default for HTTP bodies and WS
+  messages), and the HTTP server timeouts all ship with conservative
+  defaults that have been smoke-tested end-to-end but not stress-tested.
 - **Not implemented despite appearing in notes:** health-aware balancing,
-  leader-aware routing, Cypher transpilation, and the framework /
-  ontology features from `why.md` and `internal/loadbalancer/idea.md`
-  are research directions, not committed work. They are kept in the repo
-  because they shape the long-term design.
+  leader-aware routing, Cypher transpilation, and the UID-reservation /
+  named-graph convention from `why.md`, `internal/loadbalancer/idea.md`,
+  and `docs/design/uid_reservation.md` are research directions, not
+  committed work. They are kept in the repo because they shape the
+  long-term design.
 - **Dgraph version posture:** the Go module depends on
   `hypermodeinc/dgraph/v24` for GraphQL schema handling, while
   `examples/cluster/docker-compose.yml` pins
@@ -164,6 +178,7 @@ Main knobs (defined in `internal/config/config.go`):
 | `ws_token`            | `WS_TOKEN`           | auto in dev   | WebSocket auth token; required when `dev_mode: false`          |
 | `ws_allowed_origins`  | `WS_ALLOWED_ORIGINS` | empty         | Origin allow-list; required when `dev_mode: false`             |
 | `max_body_bytes`      | `MAX_BODY_BYTES`     | `1048576`     | HTTP request body cap (1 MiB)                                  |
+| `ws_max_message_bytes`| `WS_MAX_MESSAGE_BYTES` | `1048576`   | WebSocket message cap (1 MiB)                                  |
 | `ratel`               | `RATEL`              | empty         | Ratel UI host for the `/ratel` redirect                        |
 | `ratel_graphql`       | `RATEL_GRAPHQL`      | `true`        | Whether the Ratel redirect carries GraphQL support             |
 
@@ -201,7 +216,9 @@ curl -X POST http://localhost:8084/query \
 ```
 
 Request bodies are capped by `max_body_bytes` (default 1 MiB). Bodies
-larger than the cap are rejected by the handler's read path.
+larger than the cap are rejected with HTTP `413 Payload Too Large`.
+WebSocket messages are capped separately by `ws_max_message_bytes`
+(default 1 MiB); oversized frames are rejected by the WS read path.
 
 ---
 
@@ -282,7 +299,8 @@ with effort and dependency notes.
 **Now (nearest-term follow-ups)**
 
 - [ ] Structured logging (`log/slog`), request IDs, basic metrics
-- [ ] Translate oversize-body rejections to HTTP 413 explicitly
+- [x] Translate oversize-body rejections to HTTP 413 explicitly
+- [x] Cap incoming WebSocket messages (`ws_max_message_bytes`)
 - [ ] Basic per-IP rate limiting on `/query`, `/mutate`, `/graphql`, `/ws`
 
 **Next**
@@ -295,13 +313,16 @@ with effort and dependency notes.
 
 **Later / research**
 
-Tracked in `why.md` and `internal/loadbalancer/idea.md`. These are
-*vision documents*, not committed scope:
+Tracked in `why.md`, `internal/loadbalancer/idea.md`, and the
+discussion docs under `docs/design/`. These are *vision documents*,
+not committed scope:
 
 - Leader-aware routing (`round-robin-avoid-leaders`,
   `round-robin-leaders-only`)
 - State-based balancing using `/state` and resource introspection
-- Graph model abstraction and ontology schemas
+- UID-reservation / named-graph convention
+  (see `docs/design/uid_reservation.md`)
+- Predicate-prefix sharding on top of named graphs
 - Cypher / other transpilers (see `internal/astneo`)
 - Otter-as-framework
 

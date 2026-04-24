@@ -8,6 +8,8 @@ enable_websocket: true
 graphql: true
 ratel-graphql: true
 ratel: dgraph-ratel:8000
+max_body_bytes: 1048576
+ws_max_message_bytes: 1048576
 
 # --- Dev-only safety defaults ---------------------------------------------
 # dev_mode=true lets Otter auto-generate a WS token if unset and keeps the
