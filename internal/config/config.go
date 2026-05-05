@@ -50,6 +50,37 @@ type Config struct {
 	// WSMaxMessageBytes caps the size of a single incoming WebSocket message.
 	// Zero or negative means "use default".
 	WSMaxMessageBytes int64 `yaml:"ws_max_message_bytes"`
+
+	// DgraphHTTPEndpoints maps a Dgraph gRPC endpoint (the form used by
+	// `dgraph_endpoints` and the `groups`) to the HTTP endpoint Otter
+	// should proxy to for HTTP-only routes (`/health`, `/state`,
+	// `/admin/schema`, `/graphql`, …). When a gRPC endpoint is missing
+	// from the map, selectBackendHost falls back to `port - 1000` with a
+	// startup warning. Operators with non-canonical port pairs should
+	// fill this in to avoid silently misrouted traffic.
+	DgraphHTTPEndpoints map[string]string `yaml:"dgraph_http_endpoints"`
+
+	// CORSAllowedOrigins is the allow-list of Origin header values the
+	// HTTP proxy CORS layer reflects back. Entries may start with "*."
+	// to match subdomains. Empty list keeps the legacy permissive
+	// behaviour ONLY in dev mode; in non-dev mode it suppresses CORS
+	// headers entirely so cross-origin browsers cannot use credentials.
+	CORSAllowedOrigins []string `yaml:"cors_allowed_origins"`
+
+	// RateLimitRPS is the steady-state per-IP request rate accepted by the
+	// HTTP proxy on /query, /mutate, /graphql and the WebSocket upgrade
+	// path. Zero disables the limiter (back-compat default).
+	RateLimitRPS int `yaml:"rate_limit_rps"`
+
+	// RateLimitBurst is the per-IP token-bucket burst size. Defaults to
+	// RateLimitRPS when unset and the limiter is enabled.
+	RateLimitBurst int `yaml:"rate_limit_burst"`
+
+	// TrustedProxyCIDRs lists reverse proxies whose X-Forwarded-For header
+	// may be trusted by the rate limiter. Empty means X-Forwarded-For is
+	// ignored and RemoteAddr is used, which is the safe direct-exposure
+	// default.
+	TrustedProxyCIDRs []string `yaml:"trusted_proxy_cidrs"`
 }
 
 // Defaults applied by LoadConfig when the operator does not override them.
@@ -362,6 +393,76 @@ func LoadConfig() (*Config, error) {
 	}
 	if cfg.WSMaxMessageBytes <= 0 {
 		cfg.WSMaxMessageBytes = DefaultWSMaxMessageBytes
+	}
+
+	// DGRAPH_HTTP_ENDPOINTS is a comma-separated list of "grpc=http" pairs.
+	// Env entries override matching YAML entries; remaining YAML entries
+	// stay untouched.
+	if val := os.Getenv("DGRAPH_HTTP_ENDPOINTS"); val != "" {
+		if cfg.DgraphHTTPEndpoints == nil {
+			cfg.DgraphHTTPEndpoints = map[string]string{}
+		}
+		for _, pair := range strings.Split(val, ",") {
+			pair = strings.TrimSpace(pair)
+			if pair == "" {
+				continue
+			}
+			eq := strings.IndexByte(pair, '=')
+			if eq <= 0 || eq == len(pair)-1 {
+				log.Printf("Warning: invalid DGRAPH_HTTP_ENDPOINTS entry %q (expected grpc=http); skipping.", pair)
+				continue
+			}
+			grpc := strings.TrimSpace(pair[:eq])
+			httpEP := strings.TrimSpace(pair[eq+1:])
+			cfg.DgraphHTTPEndpoints[grpc] = httpEP
+		}
+		log.Printf("DgraphHTTPEndpoints overrides applied from environment: %v", cfg.DgraphHTTPEndpoints)
+	}
+
+	if val := os.Getenv("CORS_ALLOWED_ORIGINS"); val != "" {
+		origins := []string{}
+		for _, o := range strings.Split(val, ",") {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				origins = append(origins, trimmed)
+			}
+		}
+		if len(origins) > 0 {
+			cfg.CORSAllowedOrigins = origins
+			log.Printf("CORSAllowedOrigins set from environment: %v", origins)
+		}
+	}
+
+	if val := os.Getenv("RATE_LIMIT_RPS"); val != "" {
+		parsed, err := strconv.Atoi(val)
+		if err != nil || parsed < 0 {
+			log.Printf("Warning: invalid RATE_LIMIT_RPS %q; ignoring.", val)
+		} else {
+			cfg.RateLimitRPS = parsed
+		}
+	}
+	if val := os.Getenv("RATE_LIMIT_BURST"); val != "" {
+		parsed, err := strconv.Atoi(val)
+		if err != nil || parsed < 0 {
+			log.Printf("Warning: invalid RATE_LIMIT_BURST %q; ignoring.", val)
+		} else {
+			cfg.RateLimitBurst = parsed
+		}
+	}
+	if cfg.RateLimitRPS > 0 && cfg.RateLimitBurst <= 0 {
+		cfg.RateLimitBurst = cfg.RateLimitRPS
+	}
+
+	if val := os.Getenv("TRUSTED_PROXY_CIDRS"); val != "" {
+		cidrs := []string{}
+		for _, c := range strings.Split(val, ",") {
+			if trimmed := strings.TrimSpace(c); trimmed != "" {
+				cidrs = append(cidrs, trimmed)
+			}
+		}
+		if len(cidrs) > 0 {
+			cfg.TrustedProxyCIDRs = cidrs
+			log.Printf("TrustedProxyCIDRs set from environment: %v", cidrs)
+		}
 	}
 
 	// Dev-mode auto-generation. We never auto-generate a token in

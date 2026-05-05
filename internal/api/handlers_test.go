@@ -97,3 +97,37 @@ func TestValidateSchemaHandler_BodyTooLarge(t *testing.T) {
 	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
 	assert.JSONEq(t, `{"error":"Request body exceeds max_body_bytes limit (8 bytes)."}`, rec.Body.String())
 }
+
+func TestValidateSchemaHandler(t *testing.T) {
+	t.Run("Valid Schema", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/validate/schema",
+			bytes.NewBufferString("name: string @index(term) .\n"))
+		rec := httptest.NewRecorder()
+		ValidateSchemaHandler(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.JSONEq(t, `{"status":"valid","type":"schema"}`, rec.Body.String())
+	})
+
+	t.Run("Invalid Schema Syntax", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/validate/schema",
+			bytes.NewBufferString("name: not_a_real_type @index(term) .\n"))
+		rec := httptest.NewRecorder()
+		ValidateSchemaHandler(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code,
+			"a schema parser failure must not be reported as valid")
+		assert.True(t, strings.HasPrefix(rec.Body.String(), `{"error":"Failed to parse DQL schema`),
+			"error message should propagate the parser failure")
+	})
+
+	t.Run("Empty Schema (No Preds)", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/validate/schema",
+			bytes.NewBufferString("# only comments\n"))
+		rec := httptest.NewRecorder()
+		ValidateSchemaHandler(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "sem predicados")
+	})
+}

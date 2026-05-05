@@ -5,7 +5,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 
 	"github.com/OpenDgraph/Otter/internal/config"
 )
@@ -26,10 +26,16 @@ type Balancer interface {
 	Next() EndpointInfo
 }
 
+// RoundRobinBalancer cycles through a fixed slice of endpoints.
+//
+// `nodes` is set at construction and never mutated afterwards, so reads
+// are safe without a lock. `next` is bumped with atomic.AddUint64 to keep
+// `Next()` lock-free under concurrent traffic — the previous sync.Mutex
+// version was a global serialization point, since every HTTP and WS
+// handler funnels through it.
 type RoundRobinBalancer struct {
 	nodes []EndpointInfo
-	next  int
-	mu    sync.Mutex
+	next  uint64
 }
 
 func NewRoundRobinBalancer(endpoints []string) *RoundRobinBalancer {
@@ -50,22 +56,22 @@ func NewRoundRobinBalancer(endpoints []string) *RoundRobinBalancer {
 
 	return &RoundRobinBalancer{
 		nodes: nodes,
-		next:  0,
 	}
 }
 
+// Next returns the next endpoint in round-robin order. Safe for
+// concurrent use. Returns the zero EndpointInfo when no nodes are
+// configured (the warning is logged once at construction time, not on
+// every empty Next() call, to avoid log floods on a misconfigured proxy).
 func (b *RoundRobinBalancer) Next() EndpointInfo {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if len(b.nodes) == 0 {
-		log.Printf("Warning: Attempt to call Next() on a RoundRobinBalancer with no valid nodes.")
+	n := uint64(len(b.nodes))
+	if n == 0 {
 		return EndpointInfo{}
 	}
-
-	node := b.nodes[b.next]
-	b.next = (b.next + 1) % len(b.nodes)
-	return node
+	// AddUint64 returns the post-increment value; subtract 1 so the
+	// first call yields index 0.
+	i := atomic.AddUint64(&b.next, 1) - 1
+	return b.nodes[i%n]
 }
 
 // validateEndpoint rejects endpoint strings that the balancer cannot

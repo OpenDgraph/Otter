@@ -1,12 +1,9 @@
 package proxy
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"sync"
 
 	"github.com/OpenDgraph/Otter/internal/helpers"
@@ -60,34 +57,49 @@ func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var wg sync.WaitGroup
-		var mu sync.Mutex
+		// Per-slot results and errors: each goroutine writes only its
+		// own index, so the previous sync.Mutex around the slice writes
+		// was unnecessary serialization. Aggregation runs after wg.Wait,
+		// which provides a happens-before edge for the parent read.
 		responses := make([]*api.Response, len(upserts))
-		var errs []string
+		errs := make([]error, len(upserts))
 
+		// Tie the fan-out to the inbound request so a client disconnect
+		// cancels in-flight upserts on the backend instead of letting
+		// them complete on a request nobody is waiting for. Operators
+		// who want decoupled lifetime should switch this to a
+		// context.WithTimeout(context.Background(), ...).
+		ctx := r.Context()
+
+		var wg sync.WaitGroup
+		wg.Add(len(upserts))
 		for i, up := range upserts {
-			wg.Add(1)
 			go func(idx int, up *helpers.UpsertBlock) {
 				defer wg.Done()
 				mut := &api.Mutation{
 					SetNquads: []byte(up.Mutation),
 					Cond:      up.Cond,
 				}
-				resp, err := client.Upsert(context.Background(), up.Query, []*api.Mutation{mut}, true)
-				mu.Lock()
-				defer mu.Unlock()
+				resp, err := client.Upsert(ctx, up.Query, []*api.Mutation{mut}, true)
 				if err != nil {
-					errs = append(errs, err.Error())
+					errs[idx] = err
 					return
 				}
 				responses[idx] = resp
 			}(i, up)
 		}
-
 		wg.Wait()
 
-		if len(errs) > 0 {
-			helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Sprintf("Some upserts failed: %v", errs))
+		// Aggregate errors single-threaded after the join. Order
+		// matches the input for easier client-side correlation.
+		var failed []string
+		for _, e := range errs {
+			if e != nil {
+				failed = append(failed, e.Error())
+			}
+		}
+		if len(failed) > 0 {
+			helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Sprintf("Some upserts failed: %v", failed))
 			return
 		}
 
@@ -99,7 +111,7 @@ func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := client.Mutate(context.Background(), mutation)
+	resp, err := client.Mutate(r.Context(), mutation)
 	if err != nil {
 		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Sprintf("Error performing mutation: %v", err))
 		return
@@ -109,7 +121,7 @@ func (p *Proxy) HandleMutation(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Proxy) HandleDirect(w http.ResponseWriter, r *http.Request) {
-	enableCORS(w, r)
+	applyCORS(w, r, p.configs.CORSAllowedOrigins, p.configs.DevMode != nil && *p.configs.DevMode)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -126,24 +138,21 @@ func (p *Proxy) HandleDirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	targetURL := &url.URL{Scheme: "http", Host: backendHost}
-
 	path := r.URL.Path
-
 	if !allowedPaths[path] {
 		helpers.WriteJSONError(w, http.StatusForbidden, "Path not allowed")
 		return
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(targetURL)
-	originalDirector := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		originalDirector(req)
-		targetURL.Path = path
+	// Inbound path is preserved (fixedPath = "") because each allowed
+	// route maps 1:1 onto the same path on the backend. The cached
+	// proxy reuses sharedTransport so we keep keep-alive connections
+	// to the Dgraph HTTP port across requests.
+	rp := reverseProxyFor(backendHost, "")
+	if p.verbose() {
+		log.Printf("Proxying %s request to %s%s", r.Method, backendHost, path)
 	}
-
-	log.Printf("Proxying health request to %s/health", backendHost)
-	proxy.ServeHTTP(w, r)
+	rp.ServeHTTP(w, r)
 }
 
 // ! TODO: Add tests
@@ -160,40 +169,25 @@ func (p *Proxy) HandleGraphQL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	targetURL := &url.URL{Scheme: "http", Host: backendHost}
-
-	proxy := httputil.NewSingleHostReverseProxy(targetURL)
-	originalDirector := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		originalDirector(req)
-		req.URL.Path = "/graphql"
+	rp := reverseProxyFor(backendHost, "/graphql")
+	if p.verbose() {
+		log.Printf("Proxying GraphQL request to %s/graphql", backendHost)
 	}
-
-	log.Printf("Proxying GraphQL request to %s/graphql", backendHost)
-	proxy.ServeHTTP(w, r)
+	rp.ServeHTTP(w, r)
 }
 
 func (p *Proxy) HandleFrontend(w http.ResponseWriter, r *http.Request) {
-	enableCORS(w, r)
+	applyCORS(w, r, p.configs.CORSAllowedOrigins, p.configs.DevMode != nil && *p.configs.DevMode)
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	targetURL := &url.URL{
-		Scheme: "http",
-		Host:   p.configs.Ratel,
+	// Cached proxy keyed on Ratel host, with the inbound path preserved
+	// so the SPA's static assets resolve correctly.
+	rp := reverseProxyFor(p.configs.Ratel, "")
+	if p.verbose() {
+		log.Printf("Proxying RATEL frontend UI to http://%s%s", p.configs.Ratel, r.RequestURI)
 	}
-
-	proxy := httputil.NewSingleHostReverseProxy(targetURL)
-
-	// Corrigir path
-	originalDirector := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		originalDirector(req)
-		req.Host = targetURL.Host
-	}
-
-	log.Printf("Proxying RATEL frontend UI to %s%s", targetURL, r.RequestURI)
-	proxy.ServeHTTP(w, r)
+	rp.ServeHTTP(w, r)
 }

@@ -2,8 +2,10 @@ package proxy
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"strconv"
+	"sync"
 
 	"github.com/OpenDgraph/Otter/internal/config"
 	"github.com/OpenDgraph/Otter/internal/dgraph"
@@ -11,10 +13,11 @@ import (
 )
 
 type Proxy struct {
-	balancer   loadbalancer.Balancer
-	Purposeful loadbalancer.PurposefulBalancer
-	clients    map[string]*dgraph.Client
-	configs    config.Config
+	balancer     loadbalancer.Balancer
+	Purposeful   loadbalancer.PurposefulBalancer
+	clients      map[string]*dgraph.Client
+	configs      config.Config
+	fallbackOnce sync.Once
 }
 
 func NewPurposefulProxy(balancer loadbalancer.PurposefulBalancer, Config config.Config) (*Proxy, error) {
@@ -89,25 +92,43 @@ func (p *Proxy) selectBackendHost(purpose, protocol string) (string, error) {
 		return "", fmt.Errorf("no available backend for purpose '%s'", purpose)
 	}
 
-	host, portStr, splitErr := net.SplitHostPort(endpointInfo.Endpoint)
-	if splitErr != nil {
-		return "", fmt.Errorf("invalid endpoint format '%s': %w", endpointInfo.Endpoint, splitErr)
-	}
-
-	port, parseErr := strconv.Atoi(portStr)
-	if parseErr != nil {
-		return "", fmt.Errorf("invalid port in endpoint '%s': %w", endpointInfo.Endpoint, parseErr)
-	}
-
 	switch protocol {
 	case "http":
-		// Se gRPC estiver usando 90XX, http é 80XX
-		port -= 1000
+		return p.resolveHTTPEndpoint(endpointInfo.Endpoint)
 	case "grpc":
-		// nada a fazer, usa porta original
+		return endpointInfo.Endpoint, nil
 	default:
 		return "", fmt.Errorf("unsupported protocol: %s", protocol)
 	}
+}
 
-	return fmt.Sprintf("%s:%d", host, port), nil
+// resolveHTTPEndpoint maps a Dgraph gRPC endpoint to its HTTP twin. It first
+// consults Config.DgraphHTTPEndpoints (the explicit operator-supplied map)
+// and falls back to the legacy `grpcPort - 1000` formula with a one-shot
+// warning per gRPC endpoint. The legacy formula breaks for non-canonical
+// port pairs and is retained only so existing manifests keep working.
+func (p *Proxy) resolveHTTPEndpoint(grpcEndpoint string) (string, error) {
+	if mapped, ok := p.configs.DgraphHTTPEndpoints[grpcEndpoint]; ok && mapped != "" {
+		return mapped, nil
+	}
+
+	host, portStr, splitErr := net.SplitHostPort(grpcEndpoint)
+	if splitErr != nil {
+		return "", fmt.Errorf("invalid endpoint format '%s': %w", grpcEndpoint, splitErr)
+	}
+	port, parseErr := strconv.Atoi(portStr)
+	if parseErr != nil {
+		return "", fmt.Errorf("invalid port in endpoint '%s': %w", grpcEndpoint, parseErr)
+	}
+
+	p.warnFallbackOnce(grpcEndpoint)
+	return fmt.Sprintf("%s:%d", host, port-1000), nil
+}
+
+func (p *Proxy) warnFallbackOnce(grpcEndpoint string) {
+	p.fallbackOnce.Do(func() {
+		log.Printf("Warning: dgraph_http_endpoints does not cover %q; using legacy `grpcPort - 1000` mapping. "+
+			"Set dgraph_http_endpoints (or DGRAPH_HTTP_ENDPOINTS) to silence this warning and to support "+
+			"non-canonical port pairs.", grpcEndpoint)
+	})
 }

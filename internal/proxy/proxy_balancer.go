@@ -24,6 +24,8 @@ func (p *Proxy) SelectClient() (loadbalancer.EndpointInfo, *dgraph.Client, error
 	if !ok {
 		return loadbalancer.EndpointInfo{}, nil, fmt.Errorf("| Dgraph client not found for endpoint %s", endpointInfo.Endpoint)
 	}
-	log.Printf("| Selected Dgraph endpoint: %s", endpointInfo.Endpoint)
+	if p.verbose() {
+		log.Printf("| Selected Dgraph endpoint: %s", endpointInfo.Endpoint)
+	}
 	return endpointInfo, client, nil
 }

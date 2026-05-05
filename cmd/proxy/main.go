@@ -14,6 +14,7 @@ import (
 	"github.com/OpenDgraph/Otter/internal/config"
 	"github.com/OpenDgraph/Otter/internal/loadbalancer"
 	"github.com/OpenDgraph/Otter/internal/proxy"
+	"github.com/OpenDgraph/Otter/internal/ratelimit"
 	"github.com/OpenDgraph/Otter/internal/routing"
 	"github.com/OpenDgraph/Otter/internal/websocket"
 )
@@ -80,12 +81,24 @@ func main() {
 	errCh := make(chan error, 2)
 	var servers []*http.Server
 
+	limiter := ratelimit.New(cfg.RateLimitRPS, cfg.RateLimitBurst)
+	if limiter != nil {
+		log.Printf("Per-IP rate limiter enabled: %d rps, burst %d", cfg.RateLimitRPS, cfg.RateLimitBurst)
+	}
+	trustedProxies, err := ratelimit.ParseTrustedProxies(cfg.TrustedProxyCIDRs)
+	if err != nil {
+		log.Fatalf("Error parsing trusted proxy CIDRs: %v", err)
+	}
+	if len(trustedProxies) > 0 {
+		log.Printf("Rate limiter trusts X-Forwarded-For from %d proxy CIDR(s)", len(trustedProxies))
+	}
+
 	if httpOn {
 		mux := http.NewServeMux()
 		// Body-size middleware wraps every proxy route. The routing layer
 		// still decides which endpoints exist; this only bounds how much we
 		// agree to read per request.
-		mux.Handle("/", maxBytesMiddleware(routing.SetupRoutes(proxyInstance), cfg.MaxBodyBytes))
+		mux.Handle("/", maxBytesMiddleware(routing.SetupRoutes(proxyInstance, limiter, trustedProxies), cfg.MaxBodyBytes))
 
 		srv := &http.Server{
 			Addr:              fmt.Sprintf(":%d", cfg.ProxyPort),
@@ -109,7 +122,11 @@ func main() {
 
 	if wsOn {
 		wsMux := http.NewServeMux()
-		wsMux.HandleFunc("/ws", websocket.HandleWebSocketWithProxy(proxyInstance))
+		// Apply the same per-IP limiter to the WS upgrade path; once the
+		// connection is upgraded, per-message limiting is out of scope here
+		// (tracked separately in docs/product_backlog.md as item X6).
+		wsMux.Handle("/ws", ratelimit.MiddlewareWithTrustedProxies(limiter,
+			http.HandlerFunc(websocket.HandleWebSocketWithProxy(proxyInstance)), trustedProxies))
 
 		srv := &http.Server{
 			Addr:              fmt.Sprintf(":%d", cfg.WebSocketPort),

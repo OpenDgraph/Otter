@@ -179,6 +179,11 @@ Main knobs (defined in `internal/config/config.go`):
 | `ws_allowed_origins`  | `WS_ALLOWED_ORIGINS` | empty         | Origin allow-list; required when `dev_mode: false`             |
 | `max_body_bytes`      | `MAX_BODY_BYTES`     | `1048576`     | HTTP request body cap (1 MiB)                                  |
 | `ws_max_message_bytes`| `WS_MAX_MESSAGE_BYTES` | `1048576`   | WebSocket message cap (1 MiB)                                  |
+| `cors_allowed_origins`| `CORS_ALLOWED_ORIGINS` | empty       | Origin allow-list for CORS; required to enable browser credentials |
+| `rate_limit_rps`      | `RATE_LIMIT_RPS`     | `0`           | Per-IP token-bucket refill rate; `0` disables the limiter      |
+| `rate_limit_burst`    | `RATE_LIMIT_BURST`   | `0`           | Per-IP burst size; defaults to `rate_limit_rps` when unset     |
+| `trusted_proxy_cidrs` | `TRUSTED_PROXY_CIDRS` | empty        | CIDRs whose `X-Forwarded-For` header is trusted for rate limiting |
+| `dgraph_http_endpoints` | `DGRAPH_HTTP_ENDPOINTS` | empty   | gRPC→HTTP endpoint map; falls back to `grpcPort - 1000` when empty |
 | `ratel`               | `RATEL`              | empty         | Ratel UI host for the `/ratel` redirect                        |
 | `ratel_graphql`       | `RATEL_GRAPHQL`      | `true`        | Whether the Ratel redirect carries GraphQL support             |
 
@@ -301,7 +306,12 @@ with effort and dependency notes.
 - [ ] Structured logging (`log/slog`), request IDs, basic metrics
 - [x] Translate oversize-body rejections to HTTP 413 explicitly
 - [x] Cap incoming WebSocket messages (`ws_max_message_bytes`)
-- [ ] Basic per-IP rate limiting on `/query`, `/mutate`, `/graphql`, `/ws`
+- [x] Basic per-IP rate limiting on `/query`, `/mutate`, `/graphql`, `/ws`
+      (`rate_limit_rps` / `rate_limit_burst`)
+- [x] CORS allow-list with credentials gated behind matched origins
+      (`cors_allowed_origins`)
+- [x] Replace `port - 1000` heuristic with explicit `dgraph_http_endpoints`
+      map (legacy formula remains a logged fallback)
 
 **Next**
 

@@ -68,7 +68,11 @@ func ValidateSchemaHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	schemaAST, schemaErr := parsing.ParseSchema(string(body))
-	if schemaErr == nil && len(schemaAST.Preds) == 0 {
+	if schemaErr != nil {
+		helpers.WriteJSONError(w, http.StatusBadRequest, fmt.Sprintf("Failed to parse DQL schema: %v", schemaErr))
+		return
+	}
+	if len(schemaAST.Preds) == 0 {
 		helpers.WriteJSONError(w, http.StatusBadRequest, "Schema sem predicados definidos.")
 		return
 	}

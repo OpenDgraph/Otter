@@ -2,6 +2,7 @@ package loadbalancer
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/OpenDgraph/Otter/internal/config"
@@ -147,4 +148,59 @@ func TestValidatePurposeful_NilIsRejected(t *testing.T) {
 	if err := ValidatePurposeful(nil); err == nil {
 		t.Fatalf("expected error for nil balancer")
 	}
+}
+
+// TestRoundRobin_ConcurrentNextDistributesEvenly exercises the atomic
+// counter under contention. With N endpoints and N*K concurrent Next()
+// calls every endpoint must be returned exactly K times. A regression
+// in the atomic increment (data race, lost update, non-atomic mod) shows
+// up as either an off-count or a -race failure.
+func TestRoundRobin_ConcurrentNextDistributesEvenly(t *testing.T) {
+	endpoints := []string{"a:1", "b:2", "c:3", "d:4"}
+	b := NewRoundRobinBalancer(endpoints)
+
+	const perEndpoint = 1000
+	total := perEndpoint * len(endpoints)
+
+	results := make(chan string, total)
+	var wg sync.WaitGroup
+	wg.Add(total)
+	for i := 0; i < total; i++ {
+		go func() {
+			defer wg.Done()
+			results <- b.Next().Endpoint
+		}()
+	}
+	wg.Wait()
+	close(results)
+
+	counts := map[string]int{}
+	for ep := range results {
+		counts[ep]++
+	}
+	for _, ep := range endpoints {
+		if counts[ep] != perEndpoint {
+			t.Errorf("endpoint %q hit %d times, want %d (counts=%v)", ep, counts[ep], perEndpoint, counts)
+		}
+	}
+}
+
+func BenchmarkRoundRobin_NextSerial(b *testing.B) {
+	bal := NewRoundRobinBalancer([]string{"a:1", "b:2", "c:3", "d:4"})
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = bal.Next()
+	}
+}
+
+func BenchmarkRoundRobin_NextParallel(b *testing.B) {
+	bal := NewRoundRobinBalancer([]string{"a:1", "b:2", "c:3", "d:4"})
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = bal.Next()
+		}
+	})
 }

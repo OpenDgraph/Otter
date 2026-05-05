@@ -33,7 +33,15 @@ go.work.sum
 __debug*
 build/
 
+# Stray binary from `go build ./cmd/proxy` invoked from the repo root.
+# The canonical build target is `make build`, which writes to build/Otter.
+/proxy
+
 .DS_Store
+
+# Local AI/agent tooling state — never committed.
+.claude/
+.planning/
 
 **ast*.json
 
