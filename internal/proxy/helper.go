@@ -20,6 +20,13 @@ func (p *Proxy) graphQLAllowed() bool {
 	return p.configs.GraphQL != nil && *p.configs.GraphQL
 }
 
+// verbose reports whether per-request diagnostic logs should be emitted.
+// Tied to DevMode so production deployments do not pay the cost of
+// stdlib log's global mutex + stderr write on every selected backend.
+func (p *Proxy) verbose() bool {
+	return p.configs.DevMode != nil && *p.configs.DevMode
+}
+
 func (p *Proxy) SelectClientByPurpose(purpose string) (loadbalancer.EndpointInfo, *dgraph.Client, error) {
 	if p.Purposeful == nil {
 		return loadbalancer.EndpointInfo{}, nil, fmt.Errorf("purposeful balancer not initialized")
@@ -33,6 +40,8 @@ func (p *Proxy) SelectClientByPurpose(purpose string) (loadbalancer.EndpointInfo
 	if !ok {
 		return loadbalancer.EndpointInfo{}, nil, fmt.Errorf("| Dgraph client not found for endpoint %s", endpointInfo.Endpoint)
 	}
-	log.Printf("| ByPurpose | Selected Dgraph endpoint: %s", endpointInfo.Endpoint)
+	if p.verbose() {
+		log.Printf("| ByPurpose | Selected Dgraph endpoint: %s", endpointInfo.Endpoint)
+	}
 	return endpointInfo, client, nil
 }

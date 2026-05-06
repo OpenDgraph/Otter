@@ -1,4 +1,15 @@
- 
+# Example GraphQL schema for the examples/cluster compose stack.
+#
+# Dgraph's GraphQL layer auto-generates Query and Mutation from the user
+# types below (getTodoList, queryTodoList, addTodoList, updateTodoList,
+# deleteTodoList, and the equivalents for TodoItem and User). Explicit
+# Query/Mutation fields are only allowed with @custom / @lambda and are
+# intentionally not used here.
+#
+# This file is exercised by internal/astgraphql tests so that
+# regressions in the parser's handling of the realistic example are
+# caught by `go test ./internal/astgraphql/...`.
+
 type TodoList {
   id: ID!
   title: String! @search(by: [term])
@@ -11,10 +22,34 @@ type TodoList {
 type TodoItem {
   id: ID!
   text: String! @search(by: [term])
-  done: Boolean! 
+  done: Boolean!
   dueDate: DateTime
   list: TodoList!
 
   createdAt: DateTime
   updatedAt: DateTime
 }
+
+enum Role {
+  ADMIN
+  USER
+  GUEST
+}
+
+interface Entity {
+  id: ID!
+}
+
+type User implements Entity {
+  id: ID!
+  name: String!
+  role: Role
+  friend: User
+}
+
+type Admin implements Entity {
+  id: ID!
+  powers: [String!]!
+}
+
+union Account = User | Admin

@@ -8,6 +8,8 @@ enable_websocket: true
 graphql: true
 ratel: localhost:8000
 ratel-graphql: true
+max_body_bytes: 1048576
+ws_max_message_bytes: 1048576
 dgraph_endpoints: # Needed if using simple round-robin balancing
   - localhost:9080
   - localhost:9088

@@ -3,6 +3,7 @@ package dgraph
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/dgraph-io/dgo/v240"
 	"github.com/dgraph-io/dgo/v240/protos/api"
@@ -15,8 +16,10 @@ type Client struct {
 }
 
 func NewClient(endpoint string, user, password string) (*Client, error) {
-	fmt.Println("Creating Dgraph client...")
-	fmt.Println("Endpoint:", endpoint)
+	// log.Printf so the message respects the rest of Otter's logging
+	// configuration (timestamps, output writer); plain fmt.Println bypassed
+	// log routing and produced unsynchronised stdout writes.
+	log.Printf("Creating Dgraph client for endpoint %s", endpoint)
 	opts := []dgo.ClientOption{
 		dgo.WithGrpcOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 	}

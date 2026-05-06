@@ -1,3 +1,9 @@
+#! REMOVER DEPOIS
+
+.vscode
+.vscode/launch.json
+out
+
 # If you prefer the allow list template instead of the deny list, see community template:
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
@@ -27,6 +33,15 @@ go.work.sum
 __debug*
 build/
 
+# Stray binary from `go build ./cmd/proxy` invoked from the repo root.
+# The canonical build target is `make build`, which writes to build/Otter.
+/proxy
+
 .DS_Store
 
+# Local AI/agent tooling state — never committed.
+.claude/
+.planning/
+
 **ast*.json
+

@@ -1,0 +1,178 @@
+[
+    {
+        "uid": "_:Account",
+        "name": "Account",
+        "edge": [
+            {
+                "uid": "_:User",
+                "name": "User",
+                "properties": [
+                    "id",
+                    "name"
+                ],
+                "edge": [
+                    {
+                        "uid": "_:Role",
+                        "name": "Role",
+                        "properties": [
+                            "ADMIN",
+                            "USER",
+                            "GUEST"
+                        ]
+                    },
+                    {
+                        "uid": "_:User",
+                        "name": "User"
+                    }
+                ]
+            },
+            {
+                "uid": "_:Admin",
+                "name": "Admin",
+                "properties": [
+                    "id",
+                    "powers"
+                ]
+            }
+        ]
+    },
+    {
+        "uid": "_:Admin",
+        "name": "Admin",
+        "properties": [
+            "id",
+            "powers"
+        ]
+    },
+    {
+        "uid": "_:Entity",
+        "name": "Entity",
+        "edge": [
+            {
+                "uid": "_:User",
+                "name": "User",
+                "properties": [
+                    "id",
+                    "name"
+                ],
+                "edge": [
+                    {
+                        "uid": "_:Role",
+                        "name": "Role",
+                        "properties": [
+                            "ADMIN",
+                            "USER",
+                            "GUEST"
+                        ]
+                    },
+                    {
+                        "uid": "_:User",
+                        "name": "User"
+                    }
+                ]
+            },
+            {
+                "uid": "_:Admin",
+                "name": "Admin",
+                "properties": [
+                    "id",
+                    "powers"
+                ]
+            }
+        ]
+    },
+    {
+        "uid": "_:Role",
+        "name": "Role",
+        "properties": [
+            "ADMIN",
+            "USER",
+            "GUEST"
+        ]
+    },
+    {
+        "uid": "_:TodoItem",
+        "name": "TodoItem",
+        "properties": [
+            "id",
+            "text",
+            "done",
+            "dueDate",
+            "createdAt",
+            "updatedAt"
+        ],
+        "edge": [
+            {
+                "uid": "_:TodoList",
+                "name": "TodoList",
+                "properties": [
+                    "id",
+                    "title",
+                    "createdAt",
+                    "updatedAt",
+                    "todosAggregate"
+                ],
+                "edge": [
+                    {
+                        "uid": "_:TodoItem",
+                        "name": "TodoItem"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "uid": "_:TodoList",
+        "name": "TodoList",
+        "properties": [
+            "id",
+            "title",
+            "createdAt",
+            "updatedAt",
+            "todosAggregate"
+        ],
+        "edge": [
+            {
+                "uid": "_:TodoItem",
+                "name": "TodoItem",
+                "properties": [
+                    "id",
+                    "text",
+                    "done",
+                    "dueDate",
+                    "createdAt",
+                    "updatedAt"
+                ],
+                "edge": [
+                    {
+                        "uid": "_:TodoList",
+                        "name": "TodoList"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "uid": "_:User",
+        "name": "User",
+        "properties": [
+            "id",
+            "name"
+        ],
+        "edge": [
+            {
+                "uid": "_:Role",
+                "name": "Role",
+                "properties": [
+                    "ADMIN",
+                    "USER",
+                    "GUEST"
+                ]
+            },
+            {
+                "uid": "_:User",
+                "name": "User"
+            }
+        ]
+    }
+]

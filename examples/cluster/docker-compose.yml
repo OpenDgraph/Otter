@@ -8,19 +8,20 @@ services:
       target: final
     container_name: otter
     ports:
-      - "8084:8084"
-      - "8089:8089"
+      # Stable host ports for E2E tests and local curl/websocat calls.
+      - "8084:8084"   # HTTP proxy  (see manifest/config_docker.yaml: proxy_port)
+      - "8089:8089"   # WebSocket   (see manifest/config_docker.yaml: websocket_port)
     depends_on:
       - dgraph-alpha
+      - dgraph-alpha2
+      - dgraph-alpha3
     environment:
       CONFIG_FILE: /app/manifest/config.yaml
     volumes:
       - ../../manifest/config_docker.yaml:/app/manifest/config.yaml
-    working_dir: /app
-    command: ./otter
 
   dgraph-zero:
-    image: dgraph/dgraph:latest
+    image: dgraph/dgraph:v25.0.0-preview1
     container_name: dgraph-zero-otter
     ports:
       - "5080:5080"
@@ -30,7 +31,7 @@ services:
     command: dgraph zero --my=dgraph-zero:5080
 
   dgraph-alpha:
-    image: dgraph/dgraph:latest
+    image: dgraph/dgraph:v25.0.0-preview1
     container_name: dgraph-alpha-otter
     ports:
       - "8081:8081"
@@ -53,7 +54,7 @@ services:
           - dgraph-alpha1
 
   dgraph-alpha2:
-    image: dgraph/dgraph:latest
+    image: dgraph/dgraph:v25.0.0-preview1
     container_name: dgraph-alpha-otter2
     ports:
       - "8082"
@@ -72,7 +73,7 @@ services:
       -o 2
 
   dgraph-alpha3:
-    image: dgraph/dgraph:latest
+    image: dgraph/dgraph:v25.0.0-preview1
     container_name: dgraph-alpha-otter3
     ports:
       - "8083"
@@ -91,7 +92,12 @@ services:
       -o 3
 
   dgraph-ratel:
-   image: dgraph/ratel:latest
+   # Ratel is UI-only and does not ship a v25 preview image at the time of
+   # writing. Keep it behind the `ui` profile so the default stack (used by
+   # `make e2e` and `make rund`) does not block on a missing manifest.
+   # Start it explicitly with `docker compose --profile ui up dgraph-ratel`.
+   profiles: ["ui"]
+   image: dgraph/ratel:v25.0.0-preview1
    restart: always
    ports:
      - 8000

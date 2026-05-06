@@ -21,7 +21,11 @@ func ValidateDQLHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body, err := helpers.ReadRequestBody(r)
-	if err != nil || len(body) == 0 {
+	if err != nil {
+		helpers.WriteRequestBodyReadError(w, err, "Request body is empty or unreadable.")
+		return
+	}
+	if len(body) == 0 {
 		helpers.WriteJSONError(w, http.StatusBadRequest, "Request body is empty or unreadable.")
 		return
 	}
@@ -54,13 +58,21 @@ func ValidateSchemaHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body, err := helpers.ReadRequestBody(r)
-	if err != nil || len(body) == 0 {
+	if err != nil {
+		helpers.WriteRequestBodyReadError(w, err, "Corpo inválido ou vazio.")
+		return
+	}
+	if len(body) == 0 {
 		helpers.WriteJSONError(w, http.StatusBadRequest, "Corpo inválido ou vazio.")
 		return
 	}
 
 	schemaAST, schemaErr := parsing.ParseSchema(string(body))
-	if schemaErr == nil && len(schemaAST.Preds) == 0 {
+	if schemaErr != nil {
+		helpers.WriteJSONError(w, http.StatusBadRequest, fmt.Sprintf("Failed to parse DQL schema: %v", schemaErr))
+		return
+	}
+	if len(schemaAST.Preds) == 0 {
 		helpers.WriteJSONError(w, http.StatusBadRequest, "Schema sem predicados definidos.")
 		return
 	}

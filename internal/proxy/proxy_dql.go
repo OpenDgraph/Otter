@@ -46,63 +46,118 @@ func (p *Proxy) runDQLQuery(query string, w http.ResponseWriter) {
 	helpers.WriteJSONResponse(w, http.StatusOK, resp)
 }
 
-func cleanSchemaResponse(data []byte) (map[string]interface{}, error) {
-	var wrapper map[string]interface{}
+// schemaWrapper / schemaTypeRaw mirror the relevant top level of a
+// Dgraph `schema {}` response. Each entry stays as RawMessage so any
+// fields Dgraph adds in the future round-trip untouched; we only peek
+// at the discriminator (`predicate` or `name`) to decide whether to
+// keep the entry.
+type schemaWrapper struct {
+	Schema []json.RawMessage `json:"schema,omitempty"`
+	Types  []schemaTypeRaw   `json:"types,omitempty"`
+}
+
+type schemaTypeRaw struct {
+	Name   string            `json:"name"`
+	Fields []json.RawMessage `json:"fields,omitempty"`
+
+	// Extras captures any other fields on the type entry so we can
+	// re-emit them verbatim. Populated by UnmarshalJSON.
+	Extras map[string]json.RawMessage `json:"-"`
+}
+
+// nameOnly is a minimal struct for peeking at the `name` field of an
+// otherwise-opaque field entry without decoding the full object.
+type nameOnly struct {
+	Name string `json:"name"`
+}
+
+func (t schemaTypeRaw) MarshalJSON() ([]byte, error) {
+	out := make(map[string]json.RawMessage, len(t.Extras)+2)
+	for k, v := range t.Extras {
+		out[k] = v
+	}
+	name, _ := json.Marshal(t.Name)
+	out["name"] = name
+	if t.Fields != nil {
+		fields, _ := json.Marshal(t.Fields)
+		out["fields"] = fields
+	}
+	return json.Marshal(out)
+}
+
+func (t *schemaTypeRaw) UnmarshalJSON(b []byte) error {
+	m := map[string]json.RawMessage{}
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	if raw, ok := m["name"]; ok {
+		_ = json.Unmarshal(raw, &t.Name)
+		delete(m, "name")
+	}
+	if raw, ok := m["fields"]; ok {
+		_ = json.Unmarshal(raw, &t.Fields)
+		delete(m, "fields")
+	}
+	t.Extras = m
+	return nil
+}
+
+// cleanSchemaResponse strips Dgraph-internal predicates / types / fields
+// whose names start with "dgraph." from a schema response. The previous
+// map[string]interface{} version walked every nested value dynamically;
+// this version keeps each entry as raw bytes and only decodes the
+// discriminator field, so we touch O(entries) bytes once instead of
+// boxing every field into interface{}.
+//
+// Note: in the rare case that every entry under "schema" or "types" is
+// internal, the corresponding key is omitted from the cleaned output
+// (omitempty). The previous implementation emitted an explicit `null`
+// in that case. Clients should treat both as "no entries".
+func cleanSchemaResponse(data []byte) (*schemaWrapper, error) {
+	var wrapper schemaWrapper
 	if err := json.Unmarshal(data, &wrapper); err != nil {
 		return nil, err
 	}
 
-	result := make(map[string]interface{})
-
-	// --- limpar predicados do "schema"
-	if rawSchema, ok := wrapper["schema"]; ok {
-		if schemaList, ok := rawSchema.([]interface{}); ok {
-			var cleaned []interface{}
-			for _, item := range schemaList {
-				pred, ok := item.(map[string]interface{})
-				if !ok {
-					continue
-				}
-				name, _ := pred["predicate"].(string)
-				if strings.HasPrefix(name, "dgraph.") {
-					continue
-				}
-				cleaned = append(cleaned, pred)
+	// Filter `schema` in place: we only need to read each entry's
+	// "predicate" field, which sits in the JSON without a guaranteed
+	// position, so we decode into a tiny peek struct rather than the
+	// whole entry.
+	if len(wrapper.Schema) > 0 {
+		filtered := wrapper.Schema[:0]
+		for _, raw := range wrapper.Schema {
+			var peek struct {
+				Predicate string `json:"predicate"`
 			}
-			result["schema"] = cleaned
+			if err := json.Unmarshal(raw, &peek); err == nil && strings.HasPrefix(peek.Predicate, "dgraph.") {
+				continue
+			}
+			filtered = append(filtered, raw)
 		}
+		wrapper.Schema = filtered
 	}
 
-	// --- limpar types do "types"
-	if rawTypes, ok := wrapper["types"]; ok {
-		if typeList, ok := rawTypes.([]interface{}); ok {
-			var cleaned []interface{}
-			for _, item := range typeList {
-				typ, ok := item.(map[string]interface{})
-				if !ok {
-					continue
-				}
-				name, _ := typ["name"].(string)
-				if strings.HasPrefix(name, "dgraph.") {
-					continue
-				}
-				// também pode limpar predicados internos dentro do type
-				if fields, ok := typ["fields"].([]interface{}); ok {
-					var filteredFields []interface{}
-					for _, f := range fields {
-						pname, _ := f.(map[string]interface{})["name"].(string)
-						if strings.HasPrefix(pname, "dgraph.") {
-							continue
-						}
-						filteredFields = append(filteredFields, f)
+	if len(wrapper.Types) > 0 {
+		filteredTypes := wrapper.Types[:0]
+		for _, typ := range wrapper.Types {
+			if strings.HasPrefix(typ.Name, "dgraph.") {
+				continue
+			}
+			if len(typ.Fields) > 0 {
+				filteredFields := typ.Fields[:0]
+				for _, fraw := range typ.Fields {
+					var peek nameOnly
+					if err := json.Unmarshal(fraw, &peek); err == nil && strings.HasPrefix(peek.Name, "dgraph.") {
+						continue
 					}
-					typ["fields"] = filteredFields
+					filteredFields = append(filteredFields, fraw)
 				}
-				cleaned = append(cleaned, typ)
+				typ.Fields = filteredFields
 			}
-			result["types"] = cleaned
+			filteredTypes = append(filteredTypes, typ)
 		}
+		wrapper.Types = filteredTypes
 	}
 
-	return result, nil
+	return &wrapper, nil
 }

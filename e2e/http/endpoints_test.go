@@ -1,3 +1,6 @@
+//go:build e2e
+// +build e2e
+
 package http_test // Ou o nome do pacote onde seus testes HTTP ficarão
 
 import (
